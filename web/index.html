@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#DD7FD4">
+  <meta name="description" content="Dashboard de gestão de atividades e custos B2B CTACUSTOS">
+  <title>Dashboard · B2B CTACUSTOS</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="alternate icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/static/app.css?v=20260915-1">
+</head>
+<body data-page="dashboard">
+  <a class="skip-link" href="#conteudo">Ir para o conteúdo principal</a>
+
+  <header class="topbar">
+    <button class="icon-button topbar__menu" type="button" data-sidebar-toggle aria-label="Abrir menu" aria-expanded="false" aria-controls="sidebar">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+    <a class="brand" href="/" aria-label="B2B CTACUSTOS — início">
+      <img src="/static/logo-mark.svg" alt="" width="34" height="34">
+      <span><strong>B2B</strong> <span>CTACUSTOS</span></span>
+    </a>
+    <form class="topbar-search" action="/atividades" role="search">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+      <label class="sr-only" for="global-search">Buscar atividade</label>
+      <input id="global-search" name="q" type="search" placeholder="Buscar atividade, material ou código" autocomplete="off">
+      <kbd>Ctrl K</kbd>
+    </form>
+    <div class="topbar__actions">
+      <span class="sync-pill" id="sync-pill"><span class="sync-pill__dot"></span><span class="sync-pill__text">Conectando</span></span>
+      <button class="icon-button" type="button" aria-label="Notificações" title="Notificações">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
+      </button>
+      <div class="avatar" aria-label="Usuário atual">PC</div>
+    </div>
+  </header>
+
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar" aria-label="Navegação principal">
+      <div class="sidebar__scroll">
+        <nav class="nav-list">
+          <p class="nav-list__label">Visão geral</p>
+          <a class="nav-item is-active" href="/" aria-current="page">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>
+            <span class="nav-item__label">Dashboard</span>
+          </a>
+          <a class="nav-item" href="/atividades">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 11h11M9 6h11M9 16h11M4 6h.01M4 11h.01M4 16h.01"/></svg>
+            <span class="nav-item__label">Atividades</span>
+            <span class="nav-item__count" id="nav-total">—</span>
+          </a>
+          <a class="nav-item" href="/configuracoes">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"/></svg>
+            <span class="nav-item__label">Configurações</span>
+          </a>
+        </nav>
+
+        <nav class="nav-list" aria-label="Filtros por status">
+          <p class="nav-list__label">Status</p>
+          <a class="nav-item nav-item--sub" href="/atividades?status=Em%20andamento">
+            <span class="status-dot status-dot--warning"></span>
+            <span class="nav-item__label">Em andamento</span>
+            <span class="nav-item__count" id="nav-progress">—</span>
+          </a>
+          <a class="nav-item nav-item--sub" href="/atividades?status=Concluída">
+            <span class="status-dot status-dot--success"></span>
+            <span class="nav-item__label">Concluídas</span>
+            <span class="nav-item__count" id="nav-complete">—</span>
+          </a>
+          <a class="nav-item nav-item--sub" href="/atividades?status=Cancelada">
+            <span class="status-dot status-dot--neutral"></span>
+            <span class="nav-item__label">Inativas</span>
+          </a>
+        </nav>
+      </div>
+      <div class="sidebar__footer">
+        <div class="source-card">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 6c0-1.1 3.6-2 8-2s8 .9 8 2-3.6 2-8 2-8-.9-8-2Z"/><path d="M4 6v6c0 1.1 3.6 2 8 2s8-.9 8-2V6M4 12v6c0 1.1 3.6 2 8 2s8-.9 8-2v-6"/></svg>
+          <span><small>Fonte ativa</small><strong id="source-label">Excel</strong></span>
+        </div>
+      </div>
+    </aside>
+    <button class="sidebar-backdrop" type="button" data-sidebar-close aria-label="Fechar menu"></button>
+
+    <main class="main" id="conteudo" tabindex="-1">
+      <section class="page-heading">
+        <div>
+          <p class="eyebrow">Visão geral</p>
+          <h1>Dashboard de atividades</h1>
+          <p>Acompanhe volume, andamento e impacto financeiro em uma única visão.</p>
+        </div>
+        <div class="page-heading__actions">
+          <span class="updated-at" id="updated-at">Atualizando dados…</span>
+          <button class="button button--secondary" id="refresh-button" type="button" aria-label="Atualizar dados do Excel">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 6v5h-5M4 18v-5h5"/><path d="M6.1 9a7 7 0 0 1 11.6-2.6L20 11M4 13l2.3 4.6A7 7 0 0 0 18 15"/></svg>
+            <span>Atualizar</span>
+          </button>
+          <a class="button button--primary" href="/atividades?action=new">
+            Incluir atividade
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          </a>
+          <button class="button button--danger" id="shutdown-button" type="button" aria-label="Encerrar aplicativo">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v9M6.6 5.8a8 8 0 1 0 10.8 0"/></svg>
+            <span>Encerrar</span>
+          </button>
+        </div>
+      </section>
+
+      <form class="period-filter panel" id="period-filter" aria-label="Filtrar período do dashboard">
+        <div class="period-filter__mode">
+          <label class="input-group"><span>Tipo de período</span><select id="period-mode" name="mode"><option value="month">Mês</option><option value="custom">Intervalo de datas</option></select></label>
+          <label class="input-group" id="month-field"><span>Mês de referência</span><input id="period-month" name="month" type="month"></label>
+          <label class="input-group" id="start-field" hidden><span>Data inicial</span><input id="period-start" name="start" type="date"></label>
+          <label class="input-group" id="end-field" hidden><span>Data final</span><input id="period-end" name="end" type="date"></label>
+          <label class="input-group"><span>Tecnologia</span><select id="period-technology" name="technology"><option value="">Todas as tecnologias</option></select></label>
+          <button class="button button--primary" type="submit">Aplicar período</button>
+        </div>
+        <div class="period-filter__summary">
+          <span id="period-label">Mês atual</span>
+          <strong id="period-activity-count">— atividades</strong>
+          <small id="comparison-label">Comparação com o mês anterior</small>
+        </div>
+      </form>
+
+      <section class="metrics-grid" aria-label="Indicadores financeiros comparativos">
+        <article class="metric-card metric-card--rose">
+          <div class="metric-card__icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 18h16M7 15V9M12 15V5M17 15v-3"/></svg></div>
+          <div><p>Custo M.O</p><strong id="kpi-labor">—</strong><span class="metric-card__trend" id="trend-labor">—</span></div>
+        </article>
+        <article class="metric-card metric-card--amber">
+          <div class="metric-card__icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m4 8 8-4 8 4-8 4-8-4Z"/><path d="m4 12 8 4 8-4M4 16l8 4 8-4"/></svg></div>
+          <div><p>Custo Material</p><strong id="kpi-material">—</strong><span class="metric-card__trend" id="trend-material">—</span></div>
+        </article>
+        <article class="metric-card metric-card--blue">
+          <div class="metric-card__icon"><svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M16 8h-5a2 2 0 1 0 0 4h2a2 2 0 1 1 0 4H8M12 6v2M12 16v2"/></svg></div>
+          <div><p>Custo total</p><strong id="kpi-total">—</strong><span class="metric-card__trend" id="trend-total">—</span></div>
+        </article>
+        <article class="metric-card metric-card--green">
+          <div class="metric-card__icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m5 14 4-4 3 3 7-7"/><path d="M14 6h5v5"/></svg></div>
+          <div><p>GAP</p><strong id="kpi-gap">—</strong><span class="metric-card__trend" id="trend-gap">—</span></div>
+        </article>
+      </section>
+
+      <section class="dashboard-grid dashboard-grid--analytics">
+        <article class="panel analytics-panel">
+          <header class="panel__header">
+            <div><p class="eyebrow">Produção</p><h2>Por tipo de atividade</h2></div>
+            <select class="chart-metric" data-chart-metric="type" aria-label="Métrica do gráfico por tipo"><option value="quantity">Quantidade</option><option value="cost">Custo</option><option value="gap">GAP</option></select>
+          </header>
+          <div class="rank-chart" id="chart-by-type" aria-label="Gráfico por tipo de atividade"></div>
+        </article>
+
+        <article class="panel analytics-panel">
+          <header class="panel__header">
+            <div><p class="eyebrow">Equipe</p><h2>Produção por técnico</h2></div>
+            <select class="chart-metric" data-chart-metric="technician" aria-label="Métrica do gráfico por técnico"><option value="quantity">Quantidade</option><option value="cost">Custo</option><option value="gap">GAP</option></select>
+          </header>
+          <div class="rank-chart" id="chart-by-technician" aria-label="Gráfico de produção por técnico"></div>
+        </article>
+
+        <article class="panel analytics-panel panel--company">
+          <header class="panel__header">
+            <div><p class="eyebrow">Clientes</p><h2>Resultados por empresa</h2></div>
+            <select class="chart-metric" data-chart-metric="company" aria-label="Métrica do gráfico por empresa"><option value="quantity">Quantidade</option><option value="cost">Custo</option><option value="gap">GAP</option></select>
+          </header>
+          <div class="rank-chart" id="chart-by-company" aria-label="Gráfico por empresa"></div>
+        </article>
+
+        <article class="panel panel--summaries">
+          <header class="panel__header">
+            <div><p class="eyebrow">Período selecionado</p><h2>Totais de M.O e GAP</h2></div>
+            <a class="text-link" href="/atividades">Lista completa</a>
+          </header>
+          <div class="summary-tables">
+            <section class="summary-table" aria-labelledby="summary-type-title">
+              <h3 id="summary-type-title">Por tipo de atividade</h3>
+              <div class="table-wrap">
+                <table class="data-table data-table--compact data-table--summary">
+                  <caption class="sr-only">Totais de mão de obra e GAP por tipo de atividade</caption>
+                  <thead><tr><th scope="col">Tipo de atividade</th><th scope="col">Custo M.O</th><th scope="col">GAP</th></tr></thead>
+                  <tbody id="summary-by-type"><tr><td colspan="3"><div class="skeleton skeleton--row"></div></td></tr></tbody>
+                </table>
+              </div>
+            </section>
+            <section class="summary-table" aria-labelledby="summary-technology-title">
+              <h3 id="summary-technology-title">Por tecnologia</h3>
+              <div class="table-wrap">
+                <table class="data-table data-table--compact data-table--summary">
+                  <caption class="sr-only">Totais de mão de obra e GAP por tecnologia</caption>
+                  <thead><tr><th scope="col">Tecnologia</th><th scope="col">Custo M.O</th><th scope="col">GAP</th></tr></thead>
+                  <tbody id="summary-by-technology"><tr><td colspan="3"><div class="skeleton skeleton--row"></div></td></tr></tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        </article>
+
+      </section>
+    </main>
+  </div>
+
+  <div class="toast-region" id="toast-region" role="status" aria-live="polite"></div>
+  <script src="/static/app.js?v=20260915-1" defer></script>
+</body>
+</html>

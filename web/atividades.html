@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#DD7FD4">
+  <meta name="description" content="Lista detalhada de atividades B2B CTACUSTOS">
+  <title>Atividades · B2B CTACUSTOS</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="alternate icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/static/app.css?v=20260915-1">
+</head>
+<body data-page="activities">
+  <a class="skip-link" href="#conteudo">Ir para o conteúdo principal</a>
+
+  <header class="topbar">
+    <button class="icon-button topbar__menu" type="button" data-sidebar-toggle aria-label="Abrir menu" aria-expanded="false" aria-controls="sidebar">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+    <a class="brand" href="/" aria-label="B2B CTACUSTOS — início">
+      <img src="/static/logo-mark.svg" alt="" width="34" height="34">
+      <span><strong>B2B</strong> <span>CTACUSTOS</span></span>
+    </a>
+    <div class="topbar-search topbar-search--display">
+      <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+      <span>Gestão de atividades e custos</span>
+    </div>
+    <div class="topbar__actions">
+      <span class="sync-pill" id="sync-pill"><span class="sync-pill__dot"></span><span class="sync-pill__text">Conectando</span></span>
+      <button class="icon-button" type="button" aria-label="Notificações" title="Notificações">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
+      </button>
+      <div class="avatar" aria-label="Usuário atual">PC</div>
+    </div>
+  </header>
+
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar" aria-label="Navegação principal">
+      <div class="sidebar__scroll">
+        <nav class="nav-list">
+          <p class="nav-list__label">Visão geral</p>
+          <a class="nav-item" href="/">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/></svg>
+            <span class="nav-item__label">Dashboard</span>
+          </a>
+          <a class="nav-item is-active" href="/atividades" aria-current="page">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M9 11h11M9 6h11M9 16h11M4 6h.01M4 11h.01M4 16h.01"/></svg>
+            <span class="nav-item__label">Atividades</span>
+            <span class="nav-item__count" id="nav-total">—</span>
+          </a>
+          <a class="nav-item" href="/configuracoes">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3V2.8h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"/></svg>
+            <span class="nav-item__label">Configurações</span>
+          </a>
+        </nav>
+        <nav class="nav-list" aria-label="Filtros por status">
+          <p class="nav-list__label">Status</p>
+          <a class="nav-item nav-item--sub" href="/atividades?status=Em%20andamento">
+            <span class="status-dot status-dot--warning"></span><span class="nav-item__label">Em andamento</span>
+          </a>
+          <a class="nav-item nav-item--sub" href="/atividades?status=Concluída">
+            <span class="status-dot status-dot--success"></span><span class="nav-item__label">Concluídas</span>
+          </a>
+          <a class="nav-item nav-item--sub" href="/atividades?status=Cancelada">
+            <span class="status-dot status-dot--neutral"></span><span class="nav-item__label">Inativas</span>
+          </a>
+        </nav>
+      </div>
+      <div class="sidebar__footer">
+        <div class="source-card">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 6c0-1.1 3.6-2 8-2s8 .9 8 2-3.6 2-8 2-8-.9-8-2Z"/><path d="M4 6v6c0 1.1 3.6 2 8 2s8-.9 8-2V6M4 12v6c0 1.1 3.6 2 8 2s8-.9 8-2v-6"/></svg>
+          <span><small>Fonte ativa</small><strong id="source-label">Excel</strong></span>
+        </div>
+      </div>
+    </aside>
+    <button class="sidebar-backdrop" type="button" data-sidebar-close aria-label="Fechar menu"></button>
+
+    <main class="main" id="conteudo" tabindex="-1">
+      <section class="page-heading page-heading--list">
+        <div>
+          <nav class="breadcrumbs" aria-label="Navegação estrutural"><a href="/">Dashboard</a><span aria-hidden="true">/</span><span>Atividades</span></nav>
+          <h1>Atividades</h1>
+          <p>Consulte, filtre e edite os registros armazenados na planilha compartilhada.</p>
+        </div>
+        <div class="page-heading__actions">
+          <span class="result-count" id="result-count">Carregando…</span>
+          <a class="button button--secondary" id="export-button" href="/api/activities/export" download aria-label="Exportar atividades para Excel sem a coluna DRAFT" title="Exportar Excel sem DRAFT">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 20h14"/></svg>
+            <span>Exportar Excel</span>
+          </a>
+          <button class="button button--primary" id="create-button" type="button">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            <span>Incluir</span>
+          </button>
+          <button class="button button--secondary" id="refresh-button" type="button" aria-label="Atualizar dados do Excel">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 6v5h-5M4 18v-5h5"/><path d="M6.1 9a7 7 0 0 1 11.6-2.6L20 11M4 13l2.3 4.6A7 7 0 0 0 18 15"/></svg>
+            <span>Atualizar</span>
+          </button>
+          <button class="button button--danger" id="shutdown-button" type="button" aria-label="Encerrar aplicativo">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v9M6.6 5.8a8 8 0 1 0 10.8 0"/></svg>
+            <span>Encerrar</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="panel list-panel" aria-labelledby="list-title">
+        <h2 class="sr-only" id="list-title">Lista detalhada de atividades</h2>
+        <form class="filters" id="filter-form" role="search">
+          <div class="field field--search">
+            <label class="sr-only" for="list-search">Buscar na lista</label>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+            <input id="list-search" name="q" type="search" placeholder="Buscar por ID, atividade, situação ou técnico" autocomplete="off">
+          </div>
+          <div class="field field--select">
+            <label class="sr-only" for="status-filter">Filtrar por status</label>
+            <select id="status-filter" name="status"><option value="">Todos os status</option></select>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg>
+          </div>
+          <div class="field field--select">
+            <label class="sr-only" for="type-filter">Filtrar por tipo</label>
+            <select id="type-filter" name="type"><option value="">Todos os tipos</option></select>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg>
+          </div>
+          <div class="field field--select">
+            <label class="sr-only" for="technology-filter">Filtrar por tecnologia</label>
+            <select id="technology-filter" name="technology"><option value="">Todas as tecnologias</option></select>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg>
+          </div>
+          <button class="button button--secondary" id="clear-filters" type="button">Limpar filtros</button>
+        </form>
+
+        <div class="selection-bar" id="selection-bar" hidden>
+          <span><strong id="selected-id"></strong> selecionada</span>
+          <button class="text-link" id="edit-selected" type="button">Editar atividade</button>
+        </div>
+
+        <div class="table-wrap table-wrap--list">
+          <table class="data-table" id="activities-table">
+            <caption class="sr-only">Atividades com calculadora de serviços, ID, tipo, status, situação, ação de edição e DRAFT</caption>
+            <thead>
+              <tr>
+                <th scope="col" class="calculator-column"><span class="sr-only">Calculadora de custos</span></th>
+                <th scope="col" aria-sort="ascending"><button class="sort-button" type="button" data-sort="id">ID <span aria-hidden="true">↕</span></button></th>
+                <th scope="col" aria-sort="none"><button class="sort-button" type="button" data-sort="tipo_atividade">Tipo de Atividade <span aria-hidden="true">↕</span></button></th>
+                <th scope="col" aria-sort="none"><button class="sort-button" type="button" data-sort="status">Status <span aria-hidden="true">↕</span></button></th>
+                <th scope="col" aria-sort="none"><button class="sort-button" type="button" data-sort="situacao">Situação <span aria-hidden="true">↕</span></button></th>
+                <th scope="col" class="actions-column">Ações</th>
+                <th scope="col" aria-sort="none"><button class="sort-button" type="button" data-sort="draft">DRAFT <span aria-hidden="true">↕</span></button></th>
+              </tr>
+            </thead>
+            <tbody id="activities-body">
+              <tr><td colspan="7"><div class="empty-state"><div class="spinner" aria-hidden="true"></div><p>Carregando atividades…</p></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <footer class="pagination-bar">
+          <p id="pagination-summary">—</p>
+          <nav class="pagination" aria-label="Paginação da lista">
+            <button class="icon-button icon-button--bordered" type="button" id="previous-page" aria-label="Página anterior" disabled><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg></button>
+            <div id="page-buttons" class="pagination__pages"></div>
+            <button class="icon-button icon-button--bordered" type="button" id="next-page" aria-label="Próxima página" disabled><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg></button>
+          </nav>
+        </footer>
+      </section>
+    </main>
+  </div>
+
+  <dialog class="modal" id="edit-modal" aria-labelledby="modal-title">
+    <form class="modal__surface" id="edit-form" method="dialog">
+      <header class="modal__header">
+        <div><p class="eyebrow" id="modal-eyebrow">Edição da planilha</p><h2 id="modal-title">Editar atividade <span id="modal-activity-id"></span></h2></div>
+        <button class="icon-button" type="button" data-modal-close aria-label="Fechar janela"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      </header>
+      <div class="modal__body">
+        <div class="form-section form-section--identity">
+          <div class="form-section__heading"><span>1</span><div><h3>Identificação</h3><p>Dados de controle e acompanhamento.</p></div></div>
+          <div class="form-grid form-grid--four">
+            <label class="input-group" id="create-id-field" hidden><span>ID <small>(opcional)</small></span><input name="id" maxlength="60" placeholder="Gerado automaticamente"></label>
+            <label class="input-group"><span>Data</span><input name="data" type="date" required></label>
+            <label class="input-group"><span>Tipo de atividade</span><input name="tipo_atividade" list="type-options" required maxlength="120"><datalist id="type-options"></datalist></label>
+            <label class="input-group"><span>Status</span><select name="status" id="form-status" required><option value="">Selecione</option></select></label>
+            <label class="input-group input-group--wide"><span>Situação / detalhes</span><input name="situacao" required maxlength="180"></label>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <div class="form-section__heading"><span>2</span><div><h3>Empresa e equipe</h3><p>Opções lidas diretamente da planilha.</p></div></div>
+          <div class="form-grid form-grid--four">
+            <label class="input-group"><span>Empresa</span><select name="empresa" id="form-company"><option value="">Selecione</option></select></label>
+            <label class="input-group"><span>EPS</span><select name="eps" id="form-eps"><option value="">Selecione</option></select></label>
+            <label class="input-group input-group--wide"><span>Nome do técnico</span><select name="tecnico_nome" id="form-technician"><option value="">Selecione</option></select></label>
+            <label class="input-group"><span>Matrícula</span><input name="matricula" id="form-registration" maxlength="60"></label>
+            <label class="input-group"><span>Região</span><input name="regiao" list="region-options" maxlength="80"><datalist id="region-options"></datalist></label>
+            <label class="input-group"><span>Cluster</span><input name="cluster" list="cluster-options" maxlength="80"><datalist id="cluster-options"></datalist></label>
+            <label class="input-group"><span>Tecnologia</span><input name="tecnologia" list="technology-options" maxlength="80"><datalist id="technology-options"></datalist></label>
+            <label class="input-group"><span>Qtde técnicos</span><input name="qtde_tecnicos" type="number" min="0" step="1" inputmode="numeric"></label>
+            <label class="input-group"><span>Qtde dias / tempo</span><input name="qtde_dias" type="number" min="0" step="0.5" inputmode="decimal"></label>
+            <label class="input-group input-group--wide"><span>Ganho esperado / importância</span><input name="ganho_esperado" maxlength="180"></label>
+            <label class="input-group input-group--wide"><span>DRAFT</span><input name="draft" maxlength="180" placeholder="Informe o DRAFT, quando aplicável"></label>
+          </div>
+        </div>
+
+        <div class="form-section form-section--results">
+          <div class="form-section__heading"><span>3</span><div><h3>Custos da atividade</h3><p>Valores consolidados que serão fornecidos pela calculadora.</p></div></div>
+          <div class="form-grid form-grid--five">
+            <label class="input-group"><span>Custo M.O</span><div class="money-input"><span>R$</span><input name="custo_mo" type="text" inputmode="decimal" data-currency-input autocomplete="off"></div></label>
+            <label class="input-group"><span>Custo Material</span><div class="money-input"><span>R$</span><input name="custo_mat" type="text" inputmode="decimal" data-currency-input autocomplete="off"></div></label>
+            <label class="input-group"><span>Custo Total</span><output class="calculated-output" id="calc-total">R$ 0,00</output></label>
+            <label class="input-group"><span>Custo Evitado</span><output class="calculated-output" id="calc-avoided">R$ 0,00</output><input name="custo_evitado" type="hidden" value="0"></label>
+            <label class="input-group"><span>GAP</span><output class="calculated-output calculated-output--gap is-neutral" id="calc-gap" aria-label="GAP neutro: R$ 0,00">→ R$ 0,00</output><small id="calc-gap-detail">Serviços menos custo da equipe</small></label>
+          </div>
+          <p class="formula-note"><strong>Regras:</strong> Custo Total = Custo M.O + Custo Material. Custo Evitado = Custo M.O. GAP = Custo M.O − (valor técnico/dia × técnicos × dias).</p>
+        </div>
+      </div>
+      <footer class="modal__footer">
+        <p id="save-status" role="status" aria-live="polite"></p>
+        <div><button class="button button--secondary" type="button" data-modal-close>Cancelar</button><button class="button button--primary" type="submit" id="save-button">Salvar alterações</button></div>
+      </footer>
+    </form>
+  </dialog>
+
+  <dialog class="modal service-modal" id="service-calculator-modal" aria-labelledby="service-calculator-title">
+    <form class="modal__surface service-calculator" id="service-calculator-form" method="dialog">
+      <header class="modal__header service-calculator__header">
+        <div>
+          <p class="eyebrow">Calculadora de custos</p>
+          <h2 id="service-calculator-title">Materiais e M.O. <span id="service-calculator-id"></span></h2>
+          <p class="service-source" id="service-source">Carregando bases de materiais e serviços…</p>
+        </div>
+        <button class="icon-button" type="button" data-service-modal-close aria-label="Fechar calculadora"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+      </header>
+
+      <div class="calculator-tabs" role="tablist" aria-label="Etapas da calculadora">
+        <button class="calculator-tab is-active" id="materials-tab" type="button" role="tab" aria-selected="true" aria-controls="materials-panel" data-calculator-tab="materials"><span>1</span> Materiais <strong id="materials-tab-total">R$ 0,00</strong></button>
+        <button class="calculator-tab" id="services-tab" type="button" role="tab" aria-selected="false" aria-controls="services-panel" data-calculator-tab="services"><span>2</span> Serviços e equipe <strong id="services-tab-total">R$ 0,00</strong></button>
+      </div>
+
+      <div class="service-calculator__body" id="materials-panel" role="tabpanel" aria-labelledby="materials-tab">
+        <section class="service-pane service-catalog" aria-labelledby="material-catalog-title">
+          <div class="service-pane__header">
+            <div><h3 id="material-catalog-title">Materiais disponíveis</h3><p id="material-catalog-count">—</p></div>
+          </div>
+          <label class="service-search" for="material-search">
+            <span class="sr-only">Buscar material</span>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+            <input id="material-search" type="search" placeholder="Buscar por material, código ou unidade" autocomplete="off">
+          </label>
+          <div class="service-catalog__list" id="material-catalog-list" aria-live="polite">
+            <div class="service-loading"><div class="spinner" aria-hidden="true"></div><p>Lendo MATERIAL.xlsx…</p></div>
+          </div>
+        </section>
+
+        <section class="service-pane service-selection" aria-labelledby="selected-materials-title">
+          <div class="service-pane__header">
+            <div><h3 id="selected-materials-title">Materiais selecionados</h3><p id="selected-materials-count">Nenhum item</p></div>
+            <button class="text-link" id="clear-selected-materials" type="button" disabled>Limpar</button>
+          </div>
+          <div class="selected-services-table" role="table" aria-label="Materiais incluídos no cálculo">
+            <div class="selected-services-table__head" role="row">
+              <span role="columnheader">Descrição</span><span role="columnheader">Valor unitário</span><span role="columnheader">Qtd.</span><span role="columnheader">Total</span><span role="columnheader" class="sr-only">Excluir</span>
+            </div>
+            <div class="selected-services-table__body" id="selected-materials-list" role="rowgroup"></div>
+          </div>
+          <div class="service-selection__empty" id="selected-materials-empty">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            <strong>Nenhum material selecionado</strong>
+            <p>Inclua os materiais usados ou continue sem custo de material.</p>
+          </div>
+        </section>
+
+        <aside class="service-summary material-summary" aria-label="Resumo dos materiais">
+          <div class="service-summary__activity"><span>Atividade vinculada</span><strong id="material-summary-id">—</strong></div>
+          <dl>
+            <div><dt>Itens no cálculo</dt><dd id="material-summary-count">0</dd></div>
+          </dl>
+          <div class="service-summary__total material-summary__total"><span>Novo custo material</span><output id="material-total">R$ 0,00</output></div>
+          <p>O total será levado automaticamente para a etapa de serviços e salvo no Custo Material da atividade.</p>
+        </aside>
+      </div>
+
+      <div class="service-calculator__body" id="services-panel" role="tabpanel" aria-labelledby="services-tab" hidden>
+        <section class="service-pane service-catalog" aria-labelledby="service-catalog-title">
+          <div class="service-pane__header">
+            <div><h3 id="service-catalog-title">Serviços disponíveis</h3><p id="service-catalog-count">—</p></div>
+          </div>
+          <label class="service-search" for="service-search">
+            <span class="sr-only">Buscar serviço</span>
+            <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>
+            <input id="service-search" type="search" placeholder="Buscar por serviço, código ou unidade" autocomplete="off">
+          </label>
+          <div class="service-catalog__list" id="service-catalog-list" aria-live="polite">
+            <div class="service-loading"><div class="spinner" aria-hidden="true"></div><p>Lendo SERVICOS.xlsx…</p></div>
+          </div>
+        </section>
+
+        <section class="service-pane service-selection" aria-labelledby="selected-services-title">
+          <div class="service-pane__header">
+            <div><h3 id="selected-services-title">Serviços selecionados</h3><p id="selected-services-count">Nenhum item</p></div>
+            <button class="text-link" id="clear-selected-services" type="button" disabled>Limpar</button>
+          </div>
+          <div class="selected-services-table" role="table" aria-label="Serviços incluídos no cálculo">
+            <div class="selected-services-table__head" role="row">
+              <span role="columnheader">Descrição</span>
+              <span role="columnheader">Valor unitário</span>
+              <span role="columnheader">Qtd.</span>
+              <span role="columnheader">Total</span>
+              <span role="columnheader" class="sr-only">Excluir</span>
+            </div>
+            <div class="selected-services-table__body" id="selected-services-list" role="rowgroup"></div>
+          </div>
+          <div class="service-selection__empty" id="selected-services-empty">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            <strong>Nenhum serviço selecionado</strong>
+            <p>Você pode incluir serviços ou salvar somente com o custo padrão da equipe.</p>
+          </div>
+        </section>
+
+        <aside class="service-summary" aria-label="Resumo do cálculo">
+          <div class="service-summary__activity">
+            <span>Atividade vinculada</span>
+            <strong id="service-summary-id">—</strong>
+          </div>
+          <div class="service-summary__drivers">
+            <label><span>Qtde técnicos</span><input id="service-technicians" type="number" min="1" max="1000000" step="1" inputmode="numeric" required></label>
+            <label><span>Qtde dias</span><input id="service-days" type="number" min="1" max="1000000" step="1" inputmode="numeric" required></label>
+          </div>
+          <dl>
+            <div><dt>Custo M.O. atual</dt><dd id="service-current-total">R$ 0,00</dd></div>
+            <div><dt>Custo de materiais</dt><dd id="service-material-total">R$ 0,00</dd></div>
+            <div class="service-summary__standard"><dt>Custo padrão da equipe</dt><dd><strong id="service-standard-total">R$ 0,00</strong><small id="service-standard-detail">Aguardando dados da atividade</small></dd></div>
+            <div><dt>Itens no cálculo</dt><dd id="service-summary-count">0</dd></div>
+            <div><dt>Custo total previsto</dt><dd id="service-grand-total">R$ 0,00</dd></div>
+          </dl>
+          <div class="service-summary__total">
+            <span>Novo total de M.O.</span>
+            <output id="service-total">R$ 0,00</output>
+            <div class="service-summary__gap is-neutral">
+              <span>GAP (M.O. − equipe)</span>
+              <output id="service-gap" aria-label="GAP neutro: R$ 0,00">→ R$ 0,00</output>
+              <small id="service-gap-detail">R$ 0,00 − R$ 0,00</small>
+            </div>
+          </div>
+          <p>Sem serviços, o custo padrão será usado. Ao salvar, o valor substituirá o Custo M.O. e atualizará o Custo Total.</p>
+        </aside>
+      </div>
+
+      <footer class="modal__footer service-calculator__footer">
+        <p id="service-calculator-status" role="status" aria-live="polite"></p>
+        <div>
+          <button class="button button--secondary" type="button" data-service-modal-close>Cancelar</button>
+          <button class="button button--secondary" type="button" id="calculator-back" hidden>Voltar aos materiais</button>
+          <button class="button button--primary" type="button" id="calculator-next" disabled>Continuar para serviços</button>
+          <button class="button button--primary" type="submit" id="save-service-calculation" disabled hidden>Salvar cálculo</button>
+        </div>
+      </footer>
+    </form>
+  </dialog>
+
+  <div class="toast-region" id="toast-region" role="status" aria-live="polite"></div>
+  <script src="/static/app.js?v=20260915-1" defer></script>
+</body>
+</html>

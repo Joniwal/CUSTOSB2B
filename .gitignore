@@ -1,0 +1,17 @@
+.env
+.venv/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+build/
+dist/
+*.zip
+*.log
+~$*.xlsx
+B2B_CTACUSTOS_Importacoes/
+SERVICOS.xlsx
+MATERIAL.xlsx
+data/*.xlsx
+data/*.xlsm
+*.xlsx
+*.xlsm
