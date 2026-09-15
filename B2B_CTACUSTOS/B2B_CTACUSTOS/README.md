@@ -4,10 +4,13 @@ Aplicação local e responsiva para consultar e editar atividades armazenadas em
 
 ## Recursos atuais
 
-- Dashboard iniciado sempre no mês atual, com seleção por mês ou intervalo de datas.
+- Dashboard iniciado sempre no mês atual, com seleção por mês, intervalo de datas e tecnologia.
 - Comparação automática com o mês anterior ou com o intervalo anterior de mesma duração.
 - KPIs de Custo M.O, Custo Material, Custo Total e GAP.
 - Gráficos por tipo de atividade, técnico e empresa, alternando quantidade, custo e GAP.
+- Tabelas de resumo por tipo de atividade e tecnologia, com totais de Custo M.O e GAP do período filtrado.
+- Exportar Excel na página Atividades, preservando estilos e a tabela, sem a coluna DRAFT.
+- Campo DRAFT ao final da listagem e nos formulários de inclusão e edição.
 - Inclusão e edição pelo mesmo formulário, com opções de status, empresa, EPS e técnico administradas no próprio aplicativo.
 - Calculadora em duas abas, Materiais e Serviços, aberta pelo ícone antes de cada atividade e já vinculada ao registro correto.
 - Catálogos lidos de `MATERIAL.xlsx` e `SERVICOS.xlsx`, com seleção de itens, quantidades, subtotais, total de material e total de M.O.
@@ -19,6 +22,8 @@ Aplicação local e responsiva para consultar e editar atividades armazenadas em
 ### Preservação da tabela ao incluir
 
 Ao atualizar uma atividade, somente os valores das células correspondentes são alterados. Ao incluir, o aplicativo copia a formatação da última linha, mantém os formatos numéricos e amplia o intervalo da Tabela do Excel para abranger a nova linha. Para evitar conflitos de gravação, feche a planilha no Excel antes de incluir, editar ou salvar configurações.
+
+A coluna `DRAFT` é preservada na base e criada ao final, quando ausente, na primeira gravação. O botão **Exportar Excel** baixa a aba completa de atividades, sem `DRAFT`, mantendo os estilos das células, larguras, filtros e estilo da tabela. A exportação não modifica o arquivo original e não depende da paginação ou dos filtros da tela.
 
 As telas principais oferecem **Atualizar**, que relê os dados do arquivo Excel, e **Encerrar**, que finaliza o servidor local e libera a porta. O encerramento exige confirmação e só é aceito a partir do próprio computador.
 
@@ -35,7 +40,7 @@ Copy-Item .env.example .env
 
 Abra `http://127.0.0.1:8765`. O aplicativo abre o navegador automaticamente. Para evitar isso, use `python app.py --no-browser`.
 
-O arquivo de demonstração já está em `data/B2B_CTACUSTOS.xlsx`, com as abas `Dashboard`, `Atividades` e `Parametros`.
+Por segurança, o repositório não versiona arquivos `.xlsx` ou `.xlsm`. Antes de executar, sincronize a pasta compartilhada do OneDrive e configure o nome da base no `.env`.
 
 ## Configurar o Excel compartilhado
 
@@ -48,7 +53,7 @@ O sistema localiza a fonte por **nome do arquivo** e **nome exato da aba**, conf
 3. Deixe `EXCEL_PATH=` e `EXCEL_SEARCH_ROOTS=` vazios no `.env`.
 4. Configure apenas `EXCEL_FILENAME` e `EXCEL_SHEET_NAME`.
 
-O aplicativo detecta os OneDrives pessoais e corporativos do usuário pelas variáveis do Windows, pelo Registro e pelas pastas `OneDrive*` do perfil. Depois pesquisa recursivamente o arquivo pelo nome. Assim, o mesmo `.exe` e o mesmo `.env` funcionam para usuários com nomes e caminhos diferentes.
+O aplicativo detecta os OneDrives pessoais e corporativos do usuário pelas variáveis do Windows, pelo Registro e pelas pastas `OneDrive*` do perfil. Inclui também os pontos locais de bibliotecas SharePoint registrados pelo cliente de sincronização, mesmo quando estão fora de uma pasta `OneDrive*`. Depois pesquisa recursivamente o arquivo pelo nome. Assim, o mesmo `.exe` e o mesmo `.env` funcionam para usuários com nomes e caminhos diferentes.
 
 Configurações antigas que ainda usam `EXCEL_FILE_NAME` continuam compatíveis. Se `EXCEL_SEARCH_ROOTS` estiver vazio, apontar para uma pasta inexistente ou ainda contiver os textos de exemplo `SEU_USUARIO`/`SUA EMPRESA`, o aplicativo ignora essa configuração e procura automaticamente nos OneDrives sincronizados do usuário.
 
@@ -58,18 +63,13 @@ Na primeira execução, Status, Tipos de atividade, Tecnologias, Técnicos, Empr
 
 ### Acesso administrativo e bases auxiliares
 
-O acesso padrão à página Configurações é:
-
-```text
-Usuário: ADMIN
-Senha: CTAB2BADMIN*
-```
-
-Altere `ADMIN_USERNAME` e `ADMIN_PASSWORD` no `.env` antes de distribuir o aplicativo. A sessão permanece apenas enquanto o navegador e o aplicativo estiverem abertos.
+Copie `.env.example` para `.env` e defina `ADMIN_USERNAME` e uma senha exclusiva em `ADMIN_PASSWORD` antes de iniciar ou distribuir o aplicativo. O arquivo `.env` é local, está ignorado pelo Git e não deve ser publicado. A sessão permanece apenas enquanto o navegador e o aplicativo estiverem abertos.
 
 As planilhas auxiliares ficam, por padrão, na pasta `B2B_CTACUSTOS_Importacoes`, criada ao lado do Excel principal. Como essa pasta já está dentro do OneDrive sincronizado, o próprio cliente do OneDrive faz o envio para a nuvem. Use `REFERENCE_UPLOAD_DIR` no `.env` apenas se quiser outro destino local.
 
 A calculadora procura `SERVICOS.xlsx` e `MATERIAL.xlsx` ao lado da base principal e nos OneDrives sincronizados. Serviços aceita `CODIGO`, `SERVICO`, `CUSTO_UNITARIO` e `UNIDADE`. Materiais aceita `Mat_Code`, `Material`, `Unidade` e `Valor`. Código pode ficar vazio nas duas bases. Os nomes, abas e caminhos podem ser ajustados pelas variáveis `SERVICES_*` e `MATERIALS_*`; quando há uma única aba e o nome não foi configurado, ela é reconhecida automaticamente.
+
+A busca também aceita `MATERIAIS.xlsx` e `SERVIÇOS.xlsx`. Nomes alternativos podem ser definidos em `MATERIALS_EXCEL_FILENAME_ALIASES` e `SERVICES_EXCEL_FILENAME_ALIASES`, separados por `;`. O nome principal tem prioridade. Arquivos no SharePoint precisam estar sincronizados com este computador pelo OneDrive: um link de compartilhamento ou arquivo disponível apenas no navegador não é acessado sem uma API de nuvem. A base principal deste projeto permanece `B2B_CTACUSTOS.xlsx`, aba `Atividades`; `ATIVACAO.xlsx` com outro esquema não a substitui.
 
 É possível restringir a procura a várias raízes em `EXCEL_SEARCH_ROOTS`, separadas por `;` no Windows. Se houver mais de uma cópia com o mesmo nome, o aplicativo interrompe a inicialização e mostra os caminhos encontrados, evitando gravar silenciosamente no arquivo errado.
 
@@ -81,7 +81,7 @@ Preencha `EXCEL_PATH` somente quando quiser usar um caminho completo ou relativo
 EXCEL_PATH=C:\Users\USUARIO\OneDrive - Empresa\Pasta Compartilhada\B2B_CTACUSTOS.xlsx
 ```
 
-`EXCEL_FALLBACK_SAMPLE=true` permite usar a planilha incluída em `data/` quando nenhuma cópia sincronizada for localizada. Em produção, altere para `false` para exigir a base compartilhada.
+Mantenha `EXCEL_FALLBACK_SAMPLE=false` para exigir a base compartilhada. Se precisar de uma base local de testes, informe seu caminho em `EXCEL_PATH`; arquivos Excel dentro de `data/` permanecem ignorados pelo Git.
 
 ## Estrutura esperada da aba `Atividades`
 
@@ -92,8 +92,9 @@ EXCEL_PATH=C:\Users\USUARIO\OneDrive - Empresa\Pasta Compartilhada\B2B_CTACUSTOS
 | I–K | Serviço M.O, Qtde Serviço, Custo M.O |
 | L–R | Custo Total, Custo Evitado, Custo Técnico / Dia, Qtde Técnicos, Qtde Dias, Custo por Técnico, GAP |
 | S | Atualizado Em |
+| T | DRAFT (opcional; criado ao final quando ausente) |
 
-Os nomes podem variar em acentos, espaços ou pontuação, mas os quatro primeiros campos são obrigatórios. O arquivo fornecido contém validação de status, formatação condicional e fórmulas auditáveis.
+Os nomes podem variar em acentos, espaços ou pontuação, mas os quatro primeiros campos são obrigatórios. A base operacional existente também é aceita pelos aliases de cabeçalhos descritos acima; a ordem das colunas não precisa seguir este exemplo.
 
 ## Regras de cálculo
 
@@ -130,13 +131,14 @@ Execute:
 .\build_exe.ps1
 ```
 
-O resultado fica em `dist/B2B_CTACUSTOS/`. O ícone `web/static/favicon.ico` é aplicado ao executável e o mesmo símbolo aparece como favicon no site. O arquivo Excel editável fica na pasta `data` ao lado do executável.
+O resultado fica em `dist/B2B_CTACUSTOS/`. O ícone `web/static/favicon.ico` é aplicado ao executável e o mesmo símbolo aparece como favicon no site. A base compartilhada é localizada nas pastas sincronizadas do usuário, conforme o `.env`; nenhum Excel real deve ser publicado no GitHub.
 
 ## API interna
 
 - `GET /api/health`: conexão e fonte ativa.
-- `GET /api/dashboard`: métricas, distribuição, resumo financeiro e itens recentes.
-- `GET /api/activities`: filtros `q`, `status`, `type`, `sort`, `direction`, `page` e `per_page`.
+- `GET /api/dashboard`: métricas, comparação e resumos por atividade/tecnologia; filtros `month`, `start`, `end` e `technology`.
+- `GET /api/activities`: filtros `q`, `status`, `type`, `technology`, `sort`, `direction`, `page` e `per_page`.
+- `GET /api/activities/export`: baixa a aba de atividades formatada, sem DRAFT.
 - `POST /api/activities`: inclui uma atividade e amplia a tabela formatada do Excel.
 - `PUT /api/activities/{referência}`: valida e atualiza a linha exata da atividade.
 - `GET /api/service-calculation?activity={referência}`: carrega catálogo, atividade e cálculo já salvo.

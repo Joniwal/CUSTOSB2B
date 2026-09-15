@@ -1,4 +1,4 @@
- B2B CTACUSTOS
+# B2B CTACUSTOS
 
 Aplicação local e responsiva para consultar e editar atividades armazenadas em Excel. Inclui dashboard, lista detalhada, filtros, ordenação, paginação, modal de edição, cálculos financeiros, descoberta automática de pastas OneDrive sincronizadas e configuração para gerar executável Windows. Não utiliza Microsoft Graph, Azure AD nem API de nuvem.
 
