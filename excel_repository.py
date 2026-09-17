@@ -112,6 +112,22 @@ EXTRA_HEADER_ALIASES = {
     "draft": ("Draft",),
 }
 
+SERVICE_CATEGORIES = (
+    {"key": "implantacao", "label": "Implantação", "tokens": ("implant",)},
+    {"key": "reparo", "label": "Reparo", "tokens": ("reparo",)},
+    {"key": "ativacao", "label": "Ativação", "tokens": ("ativacao",)},
+)
+
+DEFAULT_TECHNOLOGIES = (
+    "ERB",
+    "GPON",
+    "VISTORIA",
+    "REPARO",
+    "ATIVAÇÃO",
+    "MAGIC TOOLS",
+    "RETIRADA EQUIPAMENTOS",
+)
+
 SERVICE_CALC_SHEET = "Calculo_Servicos"
 SERVICE_CALC_HEADERS = [
     "Chave Registro",
@@ -315,7 +331,7 @@ def business_days_for_month(month_text: str) -> int:
     return sum(1 for day in range(1, days + 1) if date(selected.year, selected.month, day).weekday() < 5)
 
 
-def calculate_values(activity: dict[str, Any]) -> dict[str, float]:
+def calculate_values(activity: dict[str, Any], *, use_team_gap: bool = True) -> dict[str, float]:
     # The activity form stores consolidated service and material amounts. GAP
     # compares the service amount with the configured cost of the assigned team.
     custo_total = round(to_number(activity.get("custo_mat")) + to_number(activity.get("custo_mo")), 2)
@@ -328,7 +344,11 @@ def calculate_values(activity: dict[str, Any]) -> dict[str, float]:
     )
     # GAP positivo: os serviços avaliados superam o custo da equipe.
     # GAP negativo: o custo da equipe supera o valor dos serviços.
-    gap = round(to_number(activity.get("custo_mo")) - custo_equipe, 2)
+    gap = (
+        round(to_number(activity.get("custo_mo")) - custo_equipe, 2)
+        if use_team_gap
+        else round(to_number(activity.get("gap")), 2)
+    )
     return {
         "custo_total": custo_total,
         "custo_por_tecnico": custo_por_tecnico,
@@ -336,7 +356,7 @@ def calculate_values(activity: dict[str, Any]) -> dict[str, float]:
     }
 
 
-def normalize_activity(raw: dict[str, Any]) -> dict[str, Any]:
+def normalize_activity(raw: dict[str, Any], *, use_team_gap: bool = True) -> dict[str, Any]:
     result: dict[str, Any] = {}
     for field in FIELD_NAMES:
         value = raw.get(field)
@@ -350,7 +370,7 @@ def normalize_activity(raw: dict[str, Any]) -> dict[str, Any]:
         else:
             result[field] = clean_text(value)
     result["calculation_mode"] = clean_text(raw.get("calculation_mode"), 24) or "detailed"
-    calculated = calculate_values(result)
+    calculated = calculate_values(result, use_team_gap=use_team_gap)
 
     # Numeric totals already present in an operational workbook are authoritative.
     # Formula cells are recalculated from the detailed inputs because data_only=False.
@@ -365,15 +385,22 @@ def normalize_activity(raw: dict[str, Any]) -> dict[str, Any]:
             calculated["custo_por_tecnico"] = (
                 round(calculated["custo_total"] / technicians, 2) if technicians > 0 else 0.0
             )
-        # O GAP segue sempre a regra atual, mesmo quando a planilha contém um
-        # valor antigo gravado com outra fórmula.
-        calculated["gap"] = calculate_values(result)["gap"]
+        raw_gap = raw.get("gap")
+        if raw_gap not in (None, "") and not str(raw_gap).lstrip().startswith("="):
+            calculated["gap"] = round(to_number(raw_gap), 2)
+        else:
+            calculated["gap"] = calculate_values(result, use_team_gap=use_team_gap)["gap"]
 
     result.update(calculated)
     return result
 
 
-def validate_update(activity_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+def validate_update(
+    activity_id: str,
+    payload: dict[str, Any],
+    *,
+    use_team_gap: bool = True,
+) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError("Dados da atividade inválidos.")
     required = ("tipo_atividade", "status", "situacao")
@@ -391,8 +418,8 @@ def validate_update(activity_id: str, payload: dict[str, Any]) -> dict[str, Any]
         if field in activity and activity[field] < 0 and field != "gap":
             raise ValueError("Valores de quantidade e custo não podem ser negativos.")
     activity["atualizado_em"] = datetime.now().isoformat(timespec="minutes")
-    activity.update(calculate_values(activity))
-    return normalize_activity(activity)
+    activity.update(calculate_values(activity, use_team_gap=use_team_gap))
+    return normalize_activity(activity, use_team_gap=use_team_gap)
 
 
 def aggregate_by(activities: list[dict[str, Any]], field: str) -> list[dict[str, Any]]:
@@ -401,13 +428,58 @@ def aggregate_by(activities: list[dict[str, Any]], field: str) -> list[dict[str,
         label = clean_text(item.get(field)) or "Não informado"
         bucket = grouped.setdefault(
             label,
-            {"label": label, "quantity": 0, "labor": 0.0, "cost": 0.0, "gap": 0.0},
+            {"label": label, "quantity": 0, "labor": 0.0, "material": 0.0, "cost": 0.0, "gap": 0.0},
         )
         bucket["quantity"] = int(bucket["quantity"]) + 1
         bucket["labor"] = round(float(bucket["labor"]) + to_number(item.get("custo_mo")), 2)
+        bucket["material"] = round(float(bucket["material"]) + to_number(item.get("custo_mat")), 2)
         bucket["cost"] = round(float(bucket["cost"]) + to_number(item.get("custo_total")), 2)
         bucket["gap"] = round(float(bucket["gap"]) + to_number(item.get("gap")), 2)
     return sorted(grouped.values(), key=lambda item: (-int(item["quantity"]), str(item["label"]).casefold()))
+
+
+def service_category(value: Any) -> str:
+    normalized = normalize_header(value)
+    for category in SERVICE_CATEGORIES:
+        if any(token in normalized for token in category["tokens"]):
+            return str(category["key"])
+    return ""
+
+
+def summarize_service_categories(
+    activities: list[dict[str, Any]],
+    settings: dict[str, Any],
+) -> list[dict[str, Any]]:
+    configured_teams = {
+        clean_text(item.get("category"), 80): max(0, int(to_number(item.get("technicians"))))
+        for item in settings.get("category_teams", [])
+        if isinstance(item, dict) and clean_text(item.get("category"), 80)
+    }
+    monthly_cost = max(0.0, to_number(settings.get("monthly_technician_cost")))
+    result: list[dict[str, Any]] = []
+    for definition in SERVICE_CATEGORIES:
+        key = str(definition["key"])
+        label = str(definition["label"])
+        category_items = [item for item in activities if service_category(item.get("tipo_atividade")) == key]
+        service_total = round(sum(to_number(item.get("custo_mo")) for item in category_items), 2)
+        material_total = round(sum(to_number(item.get("custo_mat")) for item in category_items), 2)
+        total_cost = round(service_total + material_total, 2)
+        technicians = configured_teams.get(key, 0)
+        team_value = round(monthly_cost * technicians, 2)
+        result.append(
+            {
+                "key": key,
+                "label": label,
+                "activity_count": len(category_items),
+                "technicians": technicians,
+                "team_value": team_value,
+                "service": service_total,
+                "material": material_total,
+                "total": total_cost,
+                "gap": round(service_total - team_value, 2),
+            }
+        )
+    return result
 
 
 def summarize_activities(activities: list[dict[str, Any]]) -> dict[str, Any]:
@@ -1155,6 +1227,15 @@ class LocalExcelRepository:
         reference_month = date.today().strftime("%Y-%m")
         business_days = business_days_for_month(reference_month)
         monthly_cost = 15_000.0
+        technology_names: dict[str, str] = {}
+        for name in (*activity_options["technologies"], *DEFAULT_TECHNOLOGIES):
+            text = clean_text(name, 160)
+            if text:
+                technology_names.setdefault(text.casefold(), text)
+        technology_rates = [
+            {"name": name, "service_cost": 0.0, "configured": False}
+            for name in technology_names.values()
+        ]
         settings = {
             "reference_month": reference_month,
             "monthly_technician_cost": monthly_cost,
@@ -1162,7 +1243,12 @@ class LocalExcelRepository:
             "global_daily_rate": round(monthly_cost / business_days, 2),
             "statuses": list(activity_options["statuses"]),
             "types": list(activity_options["types"]),
-            "technologies": list(activity_options["technologies"]),
+            "technologies": [item["name"] for item in technology_rates],
+            "technology_rates": technology_rates,
+            "category_teams": [
+                {"category": category["key"], "label": category["label"], "technicians": 0}
+                for category in SERVICE_CATEGORIES
+            ],
             "technicians": [dict(item) for item in activity_options["technicians"]],
             "companies": list(activity_options["companies"]),
             "eps": list(activity_options["eps"]),
@@ -1171,7 +1257,10 @@ class LocalExcelRepository:
                 "services": {"filename": "", "path": "", "uploaded_at": ""},
                 "materials": {"filename": "", "path": "", "uploaded_at": ""},
             },
-            "calculation_status": "Custo técnico/dia = custo mensal ÷ dias úteis do mês.",
+            "calculation_status": (
+                "Valor da equipe por categoria = total de técnicos × custo mensal do técnico. "
+                "O custo diário permanece disponível somente para a calculadora detalhada."
+            ),
         }
         openpyxl = self._openpyxl()
         try:
@@ -1215,14 +1304,18 @@ class LocalExcelRepository:
                     "statuses": [],
                     "types": [],
                     "technologies": [],
+                    "technology_rates": [],
                     "technicians": [],
                     "companies": [],
                     "eps": [],
+                    "category_teams": [],
                 }
                 configured_catalogs: set[str] = set()
+                technology_catalog_has_rates = False
                 for row in sheet.iter_rows(min_row=header_row + 1, values_only=True):
                     category = normalize_header(row[0] if len(row) > 0 else "")
-                    code = clean_text(row[1] if len(row) > 1 else "", 120)
+                    raw_code = row[1] if len(row) > 1 else ""
+                    code = clean_text(raw_code, 120)
                     value = clean_text(row[2] if len(row) > 2 else "", 500)
                     uploaded_at = clean_text(row[3] if len(row) > 3 else "", 40)
                     if category == "status" and value:
@@ -1235,6 +1328,26 @@ class LocalExcelRepository:
                         configured_catalogs.add("technologies")
                         if value:
                             configured["technologies"].append(value)
+                            configured["technology_rates"].append(
+                                {
+                                    "name": value,
+                                    "service_cost": max(0.0, to_number(raw_code)),
+                                    "configured": raw_code not in (None, ""),
+                                }
+                            )
+                            technology_catalog_has_rates = technology_catalog_has_rates or raw_code not in (None, "")
+                    elif category in {"equipecategoria", "categoriaequipe"} and code:
+                        category_key = service_category(code) or normalize_header(code)
+                        if category_key in {item["key"] for item in SERVICE_CATEGORIES}:
+                            configured["category_teams"].append(
+                                {
+                                    "category": category_key,
+                                    "label": next(
+                                        item["label"] for item in SERVICE_CATEGORIES if item["key"] == category_key
+                                    ),
+                                    "technicians": max(0, int(to_number(value))),
+                                }
+                            )
                     elif category in {"tecnico", "tecnicos"} and (code or value):
                         configured["technicians"].append({"registration": code, "name": value})
                     elif category in {"empresa", "empresas"} and value:
@@ -1260,6 +1373,27 @@ class LocalExcelRepository:
                     configured["types"] = settings["types"]
                 if "technologies" not in configured_catalogs:
                     configured["technologies"] = settings["technologies"]
+                    configured["technology_rates"] = settings["technology_rates"]
+                elif not technology_catalog_has_rates:
+                    # Migração transparente do cadastro antigo, que possuía
+                    # somente o nome da tecnologia e nenhuma coluna de valor.
+                    merged_rates: dict[str, dict[str, Any]] = {
+                        item["name"].casefold(): item for item in configured["technology_rates"]
+                    }
+                    for item in settings["technology_rates"]:
+                        merged_rates.setdefault(item["name"].casefold(), item)
+                    configured["technology_rates"] = list(merged_rates.values())
+                    configured["technologies"] = [item["name"] for item in configured["technology_rates"]]
+                configured_team_map = {
+                    item["category"]: item for item in configured["category_teams"]
+                }
+                configured["category_teams"] = [
+                    configured_team_map.get(
+                        category["key"],
+                        {"category": category["key"], "label": category["label"], "technicians": 0},
+                    )
+                    for category in SERVICE_CATEGORIES
+                ]
                 settings.update(configured)
                 return settings
             finally:
@@ -1275,6 +1409,9 @@ class LocalExcelRepository:
                 "statuses": settings["statuses"],
                 "types": settings["types"],
                 "technologies": settings["technologies"],
+                "technology_rates": settings["technology_rates"],
+                "category_teams": settings["category_teams"],
+                "monthly_technician_cost": settings["monthly_technician_cost"],
                 "technicians": settings["technicians"],
                 "companies": settings["companies"],
                 "eps": settings["eps"],
@@ -1383,14 +1520,37 @@ class LocalExcelRepository:
             if field != "id"
         }
 
-    def _prepare_activity(self, activity_id: str, payload: dict[str, Any], mode: str) -> dict[str, Any]:
-        activity = validate_update(activity_id, payload)
+    def _prepare_activity(
+        self,
+        activity_id: str,
+        payload: dict[str, Any],
+        mode: str,
+        *,
+        use_team_gap: bool = True,
+        technology_rates: list[dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
+        prepared_payload = dict(payload)
+        technology_key = normalize_header(prepared_payload.get("tecnologia"))
+        if technology_key and technology_rates is not None:
+            rate_by_technology = {
+                normalize_header(item.get("name")): max(0.0, to_number(item.get("service_cost")))
+                for item in technology_rates
+                if (
+                    isinstance(item, dict)
+                    and clean_text(item.get("name"))
+                    and item.get("configured", True) is not False
+                )
+            }
+            if technology_key in rate_by_technology:
+                prepared_payload["custo_mo"] = rate_by_technology[technology_key]
+        activity = validate_update(activity_id, prepared_payload, use_team_gap=use_team_gap)
         activity["calculation_mode"] = mode
+        activity["_use_team_gap"] = use_team_gap
         if not activity.get("data"):
             activity["data"] = date.today().isoformat()
         # Regra de negócio: o custo evitado representa o valor da mão de obra.
         activity["custo_evitado"] = round(to_number(activity.get("custo_mo")), 2)
-        activity.update(calculate_values(activity))
+        activity.update(calculate_values(activity, use_team_gap=use_team_gap))
         return activity
 
     def _apply_activity_to_row(
@@ -1431,7 +1591,7 @@ class LocalExcelRepository:
                     cell.value = activity["custo_por_tecnico"]
             elif field == "gap":
                 gap_dependencies = ("custo_mo", "custo_tecnico_dia", "qtde_tecnicos", "qtde_dias")
-                if all(dependency in field_columns for dependency in gap_dependencies):
+                if activity.get("_use_team_gap") and all(dependency in field_columns for dependency in gap_dependencies):
                     labor = get_column_letter(field_columns["custo_mo"])
                     daily_rate = get_column_letter(field_columns["custo_tecnico_dia"])
                     technicians = get_column_letter(field_columns["qtde_tecnicos"])
@@ -1516,6 +1676,7 @@ class LocalExcelRepository:
                     pass
 
     def update_activity(self, activity_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        settings = self.get_settings()
         with self._lock:
             openpyxl = self._openpyxl()
             try:
@@ -1534,13 +1695,19 @@ class LocalExcelRepository:
                 merged_payload.update(payload)
                 merged_payload["custo_tecnico_dia"] = self._daily_rate_from_open_workbook(workbook)
                 actual_id = clean_text(sheet.cell(target_row, field_columns["id"]).value, 60)
-                activity = self._prepare_activity(actual_id, merged_payload, mode)
+                activity = self._prepare_activity(
+                    actual_id,
+                    merged_payload,
+                    mode,
+                    use_team_gap=False,
+                    technology_rates=settings.get("technology_rates", []),
+                )
 
                 self._apply_activity_to_row(
                     sheet, headers, field_columns, target_row, activity, mode, include_id=False
                 )
                 self._save_workbook(workbook)
-                saved = normalize_activity(activity)
+                saved = normalize_activity(activity, use_team_gap=False)
                 saved["record_key"] = self._record_key(target_row, saved["id"])
                 return saved
             except PermissionError as exc:
@@ -1549,6 +1716,7 @@ class LocalExcelRepository:
                 raise RepositoryError(f"Não foi possível salvar o Excel: {exc}") from exc
 
     def create_activity(self, payload: dict[str, Any]) -> dict[str, Any]:
+        settings = self.get_settings()
         with self._lock:
             openpyxl = self._openpyxl()
             try:
@@ -1571,7 +1739,13 @@ class LocalExcelRepository:
                 activity_id = requested_id or str(max(numeric_ids, default=0) + 1)
                 prepared_payload = dict(payload)
                 prepared_payload["custo_tecnico_dia"] = self._daily_rate_from_open_workbook(workbook)
-                activity = self._prepare_activity(activity_id, prepared_payload, mode)
+                activity = self._prepare_activity(
+                    activity_id,
+                    prepared_payload,
+                    mode,
+                    use_team_gap=False,
+                    technology_rates=settings.get("technology_rates", []),
+                )
 
                 target_row = sheet.max_row + 1
                 previous_row = target_row - 1
@@ -1581,7 +1755,7 @@ class LocalExcelRepository:
                 )
                 self._extend_tables(sheet, previous_row, target_row)
                 self._save_workbook(workbook)
-                saved = normalize_activity(activity)
+                saved = normalize_activity(activity, use_team_gap=False)
                 saved["record_key"] = self._record_key(target_row, saved["id"])
                 return saved
             except PermissionError as exc:
@@ -2168,17 +2342,64 @@ class LocalExcelRepository:
             return list(unique.values())
 
         statuses = clean_list("statuses")
-        current_settings = self.get_settings() if "types" not in payload or "technologies" not in payload else {}
+        current_settings = self.get_settings()
         types = (
             clean_list("types")
             if "types" in payload
             else [clean_text(value, 160) for value in current_settings.get("types", []) if clean_text(value, 160)]
         )
-        technologies = (
-            clean_list("technologies")
-            if "technologies" in payload
-            else [clean_text(value, 160) for value in current_settings.get("technologies", []) if clean_text(value, 160)]
-        )
+
+        raw_technology_rates = payload.get("technology_rates")
+        if raw_technology_rates is None and "technologies" in payload:
+            raw_technology_rates = [
+                {"name": name, "service_cost": 0}
+                for name in clean_list("technologies")
+            ]
+        if raw_technology_rates is None:
+            raw_technology_rates = current_settings.get("technology_rates", [])
+        if not isinstance(raw_technology_rates, list):
+            raise ValueError("O cadastro de tecnologias é inválido.")
+        technology_map: dict[str, dict[str, Any]] = {}
+        for item in raw_technology_rates:
+            if isinstance(item, str):
+                name = clean_text(item, 160)
+                service_cost = 0.0
+            elif isinstance(item, dict):
+                name = clean_text(item.get("name"), 160)
+                service_cost = to_number(item.get("service_cost"))
+            else:
+                raise ValueError("O cadastro de tecnologias contém um item inválido.")
+            if service_cost < 0:
+                raise ValueError("O valor do serviço por tecnologia não pode ser negativo.")
+            if name:
+                technology_map.setdefault(
+                    name.casefold(),
+                    {"name": name, "service_cost": round(service_cost, 2)},
+                )
+        technology_rates = list(technology_map.values())
+        technologies = [item["name"] for item in technology_rates]
+
+        raw_category_teams = payload.get("category_teams", current_settings.get("category_teams", []))
+        if not isinstance(raw_category_teams, list):
+            raise ValueError("A configuração das equipes por categoria é inválida.")
+        supplied_teams: dict[str, int] = {}
+        valid_category_keys = {str(item["key"]) for item in SERVICE_CATEGORIES}
+        for item in raw_category_teams:
+            if not isinstance(item, dict):
+                raise ValueError("A configuração das equipes contém um item inválido.")
+            category_key = service_category(item.get("category")) or normalize_header(item.get("category"))
+            raw_technicians = to_number(item.get("technicians"))
+            if category_key not in valid_category_keys or raw_technicians < 0 or not raw_technicians.is_integer():
+                raise ValueError("Informe quantidades inteiras e não negativas para as equipes por categoria.")
+            supplied_teams[category_key] = int(raw_technicians)
+        category_teams = [
+            {
+                "category": category["key"],
+                "label": category["label"],
+                "technicians": supplied_teams.get(str(category["key"]), 0),
+            }
+            for category in SERVICE_CATEGORIES
+        ]
         companies = clean_list("companies")
         eps_values = clean_list("eps")
         raw_technicians = payload.get("technicians", [])
@@ -2231,10 +2452,12 @@ class LocalExcelRepository:
                     sheet.append(["TIPO_ATIVIDADE", "", activity_type])
                 if not types:
                     sheet.append(["TIPO_ATIVIDADE", "", ""])
-                for technology in technologies:
-                    sheet.append(["TECNOLOGIA", "", technology])
-                if not technologies:
+                for technology in technology_rates:
+                    sheet.append(["TECNOLOGIA", technology["service_cost"], technology["name"]])
+                if not technology_rates:
                     sheet.append(["TECNOLOGIA", "", ""])
+                for team in category_teams:
+                    sheet.append(["EQUIPE_CATEGORIA", team["category"], team["technicians"]])
                 for item in technicians:
                     sheet.append(["TECNICO", item["registration"], item["name"]])
                 for company in companies:
@@ -2255,6 +2478,11 @@ class LocalExcelRepository:
                 sheet["B2"].number_format = 'R$ #,##0.00'
                 sheet["B3"].number_format = "0"
                 sheet["B4"].number_format = 'R$ #,##0.00'
+                for row_number in range(9, sheet.max_row + 1):
+                    if normalize_header(sheet.cell(row_number, 1).value) == "tecnologia":
+                        sheet.cell(row_number, 2).number_format = 'R$ #,##0.00'
+                    elif normalize_header(sheet.cell(row_number, 1).value) == "equipecategoria":
+                        sheet.cell(row_number, 3).number_format = '0'
                 sheet.column_dimensions["A"].width = 24
                 sheet.column_dimensions["B"].width = 24
                 sheet.column_dimensions["C"].width = 58

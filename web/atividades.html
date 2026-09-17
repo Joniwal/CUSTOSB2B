@@ -8,7 +8,7 @@
   <title>Atividades · B2B CTACUSTOS</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="alternate icon" href="/favicon.ico">
-  <link rel="stylesheet" href="/static/app.css?v=20260915-1">
+  <link rel="stylesheet" href="/static/app.css?v=20260916-1">
 </head>
 <body data-page="activities">
   <a class="skip-link" href="#conteudo">Ir para o conteúdo principal</a>
@@ -193,10 +193,7 @@
             <label class="input-group"><span>Matrícula</span><input name="matricula" id="form-registration" maxlength="60"></label>
             <label class="input-group"><span>Região</span><input name="regiao" list="region-options" maxlength="80"><datalist id="region-options"></datalist></label>
             <label class="input-group"><span>Cluster</span><input name="cluster" list="cluster-options" maxlength="80"><datalist id="cluster-options"></datalist></label>
-            <label class="input-group"><span>Tecnologia</span><input name="tecnologia" list="technology-options" maxlength="80"><datalist id="technology-options"></datalist></label>
-            <label class="input-group"><span>Qtde técnicos</span><input name="qtde_tecnicos" type="number" min="0" step="1" inputmode="numeric"></label>
-            <label class="input-group"><span>Qtde dias / tempo</span><input name="qtde_dias" type="number" min="0" step="0.5" inputmode="decimal"></label>
-            <label class="input-group input-group--wide"><span>Ganho esperado / importância</span><input name="ganho_esperado" maxlength="180"></label>
+            <label class="input-group input-group--wide"><span>Tecnologia</span><select name="tecnologia" id="form-technology"><option value="">Selecione</option></select><small>O valor configurado será aplicado automaticamente ao Custo Serviço.</small></label>
             <label class="input-group input-group--wide"><span>DRAFT</span><input name="draft" maxlength="180" placeholder="Informe o DRAFT, quando aplicável"></label>
           </div>
         </div>
@@ -204,13 +201,13 @@
         <div class="form-section form-section--results">
           <div class="form-section__heading"><span>3</span><div><h3>Custos da atividade</h3><p>Valores consolidados que serão fornecidos pela calculadora.</p></div></div>
           <div class="form-grid form-grid--five">
-            <label class="input-group"><span>Custo M.O</span><div class="money-input"><span>R$</span><input name="custo_mo" type="text" inputmode="decimal" data-currency-input autocomplete="off"></div></label>
+            <label class="input-group"><span>Custo Serviço</span><div class="money-input"><span>R$</span><input name="custo_mo" type="text" inputmode="decimal" data-currency-input autocomplete="off" readonly></div></label>
             <label class="input-group"><span>Custo Material</span><div class="money-input"><span>R$</span><input name="custo_mat" type="text" inputmode="decimal" data-currency-input autocomplete="off"></div></label>
             <label class="input-group"><span>Custo Total</span><output class="calculated-output" id="calc-total">R$ 0,00</output></label>
             <label class="input-group"><span>Custo Evitado</span><output class="calculated-output" id="calc-avoided">R$ 0,00</output><input name="custo_evitado" type="hidden" value="0"></label>
-            <label class="input-group"><span>GAP</span><output class="calculated-output calculated-output--gap is-neutral" id="calc-gap" aria-label="GAP neutro: R$ 0,00">→ R$ 0,00</output><small id="calc-gap-detail">Serviços menos custo da equipe</small></label>
+            <label class="input-group"><span>GAP</span><output class="calculated-output calculated-output--gap is-neutral" id="calc-gap" aria-label="GAP calculado por categoria">Por categoria</output><small id="calc-gap-detail">Calculado no Dashboard com a equipe configurada.</small></label>
           </div>
-          <p class="formula-note"><strong>Regras:</strong> Custo Total = Custo M.O + Custo Material. Custo Evitado = Custo M.O. GAP = Custo M.O − (valor técnico/dia × técnicos × dias).</p>
+          <p class="formula-note"><strong>Regras:</strong> Custo Total = Custo Serviço + Custo Material. Custo Evitado = Custo Serviço. O GAP é consolidado por categoria no Dashboard, sem usar técnicos × dias neste formulário.</p>
         </div>
       </div>
       <footer class="modal__footer">
@@ -225,7 +222,7 @@
       <header class="modal__header service-calculator__header">
         <div>
           <p class="eyebrow">Calculadora de custos</p>
-          <h2 id="service-calculator-title">Materiais e M.O. <span id="service-calculator-id"></span></h2>
+          <h2 id="service-calculator-title">Materiais e Serviços <span id="service-calculator-id"></span></h2>
           <p class="service-source" id="service-source">Carregando bases de materiais e serviços…</p>
         </div>
         <button class="icon-button" type="button" data-service-modal-close aria-label="Fechar calculadora"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
@@ -326,22 +323,22 @@
             <label><span>Qtde dias</span><input id="service-days" type="number" min="1" max="1000000" step="1" inputmode="numeric" required></label>
           </div>
           <dl>
-            <div><dt>Custo M.O. atual</dt><dd id="service-current-total">R$ 0,00</dd></div>
+            <div><dt>Custo Serviço atual</dt><dd id="service-current-total">R$ 0,00</dd></div>
             <div><dt>Custo de materiais</dt><dd id="service-material-total">R$ 0,00</dd></div>
             <div class="service-summary__standard"><dt>Custo padrão da equipe</dt><dd><strong id="service-standard-total">R$ 0,00</strong><small id="service-standard-detail">Aguardando dados da atividade</small></dd></div>
             <div><dt>Itens no cálculo</dt><dd id="service-summary-count">0</dd></div>
             <div><dt>Custo total previsto</dt><dd id="service-grand-total">R$ 0,00</dd></div>
           </dl>
           <div class="service-summary__total">
-            <span>Novo total de M.O.</span>
+            <span>Novo total de Serviços</span>
             <output id="service-total">R$ 0,00</output>
             <div class="service-summary__gap is-neutral">
-              <span>GAP (M.O. − equipe)</span>
+              <span>GAP (Serviços − equipe)</span>
               <output id="service-gap" aria-label="GAP neutro: R$ 0,00">→ R$ 0,00</output>
               <small id="service-gap-detail">R$ 0,00 − R$ 0,00</small>
             </div>
           </div>
-          <p>Sem serviços, o custo padrão será usado. Ao salvar, o valor substituirá o Custo M.O. e atualizará o Custo Total.</p>
+          <p>Sem serviços, o custo padrão será usado. Ao salvar, o valor substituirá o Custo Serviço e atualizará o Custo Total.</p>
         </aside>
       </div>
 
@@ -358,6 +355,6 @@
   </dialog>
 
   <div class="toast-region" id="toast-region" role="status" aria-live="polite"></div>
-  <script src="/static/app.js?v=20260915-1" defer></script>
+  <script src="/static/app.js?v=20260916-1" defer></script>
 </body>
 </html>

@@ -231,6 +231,7 @@
       setConnection(true, data.source);
       const metrics = data.metrics;
       renderKpis(data.kpis);
+      renderCategoryKpis(data.category_kpis || []);
       renderDashboardCharts();
       renderDashboardSummaries(data.charts.by_type, data.charts.by_technology);
       document.querySelector("#nav-total").textContent = metrics.total;
@@ -276,6 +277,55 @@
       }
       trend.title = `Anterior: ${money.format(item.previous || 0)}`;
     });
+  }
+
+  const categoryMetricIcons = {
+    service: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="m14.7 6.3 3-3a4 4 0 0 1-5 5L6 15l-3 1 1-3 6.7-6.7a4 4 0 0 1 5-5l-3 3"/></svg>',
+    material: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="m4 8 8-4 8 4v8l-8 4-8-4Z"/><path d="m4 8 8 4 8-4M12 12v8"/></svg>',
+    total: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 3h12v18H6zM9 7h6M9 11h2M14 11h1M9 15h2M14 15h1"/></svg>',
+    gap: '<svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v18M5 6h14M7 6l-4 7h8L7 6ZM17 6l-4 7h8l-4-7ZM8 21h8"/></svg>',
+  };
+
+  function categoryTrend(trend) {
+    if (!trend || trend.change_percent === null) {
+      return '<span class="category-metric__trend is-flat">Sem base anterior</span>';
+    }
+    const direction = trend.delta > 0 ? "is-up" : trend.delta < 0 ? "is-down" : "is-flat";
+    const arrow = trend.delta > 0 ? "↑" : trend.delta < 0 ? "↓" : "→";
+    return `<span class="category-metric__trend ${direction}" title="Anterior: ${escapeHtml(money.format(trend.previous || 0))}">${arrow} ${escapeHtml(number.format(Math.abs(trend.change_percent)))}% vs. anterior</span>`;
+  }
+
+  function renderCategoryKpis(categories) {
+    const target = document.querySelector("#category-kpi-groups");
+    if (!target) return;
+    if (!categories.length) {
+      target.innerHTML = `<div class="empty-state">${iconEmpty}<p>Nenhuma categoria disponível.</p></div>`;
+      return;
+    }
+    const metrics = [
+      ["service", "Total Serviços"],
+      ["material", "Materiais"],
+      ["total", "Custo total"],
+      ["gap", "GAP"],
+    ];
+    target.innerHTML = categories.map((category) => `
+      <article class="category-kpi-group">
+        <header class="category-kpi-group__header">
+          <div><span>${escapeHtml(number.format(category.activity_count || 0))} atividade(s)</span><h3>${escapeHtml(category.label)}</h3></div>
+          <p><strong>${escapeHtml(number.format(category.technicians || 0))} técnico(s)</strong><span>Vlr. equipe: ${escapeHtml(money.format(category.team_value || 0))}</span></p>
+        </header>
+        <div class="category-kpi-grid">
+          ${metrics.map(([key, label]) => {
+            const value = Number(category[key] || 0);
+            const gapState = key === "gap" ? (value > 0 ? " is-positive" : value < 0 ? " is-negative" : " is-neutral") : "";
+            const arrow = key === "gap" ? (value > 0 ? "↑ " : value < 0 ? "↓ " : "→ ") : "";
+            return `<div class="category-metric category-metric--${key}${gapState}">
+              <span class="category-metric__icon">${categoryMetricIcons[key]}</span>
+              <div><span class="category-metric__label">${label}</span><strong>${arrow}${escapeHtml(money.format(value))}</strong>${categoryTrend(category.trends?.[key])}</div>
+            </div>`;
+          }).join("")}
+        </div>
+      </article>`).join("");
   }
 
   function renderDashboardCharts() {
@@ -568,8 +618,8 @@
 
   const activityFields = [
     "id", "data", "tipo_atividade", "status", "situacao", "empresa", "eps",
-    "tecnico_nome", "matricula", "regiao", "cluster", "tecnologia", "ganho_esperado",
-    "custo_mo", "custo_mat", "custo_evitado", "qtde_tecnicos", "qtde_dias", "draft",
+    "tecnico_nome", "matricula", "regiao", "cluster", "tecnologia",
+    "custo_mo", "custo_mat", "custo_evitado", "draft",
   ];
 
   function populateFormOptions(options) {
@@ -581,6 +631,10 @@
     setOptions("#form-status", options.statuses);
     setOptions("#form-company", options.companies);
     setOptions("#form-eps", options.eps);
+    const technology = document.querySelector("#form-technology");
+    technology.innerHTML = '<option value="">Selecione</option>' + (options.technology_rates || []).map((item) => (
+      `<option value="${escapeHtml(item.name)}"${item.configured === false ? "" : ` data-service-cost="${escapeHtml(Number(item.service_cost || 0))}"`}>${escapeHtml(item.name)} · ${item.configured === false ? "valor não configurado" : escapeHtml(money.format(Number(item.service_cost || 0)))}</option>`
+    )).join("");
     const technician = document.querySelector("#form-technician");
     technician.innerHTML = '<option value="">Selecione</option>' + (options.technicians || []).map((item) => `<option value="${escapeHtml(item.name)}" data-registration="${escapeHtml(item.registration)}">${escapeHtml(item.name)}${item.registration ? ` · ${escapeHtml(item.registration)}` : ""}</option>`).join("");
     const fillDatalist = (selector, values) => {
@@ -590,7 +644,6 @@
     fillDatalist("#type-options", options.types);
     fillDatalist("#region-options", options.regions);
     fillDatalist("#cluster-options", options.clusters);
-    fillDatalist("#technology-options", options.technologies);
   }
 
   function ensureSelectValue(select, value) {
@@ -633,6 +686,7 @@
       if (form.elements[field].tagName === "SELECT") ensureSelectValue(form.elements[field], activity[field]);
       else form.elements[field].value = activity[field] ?? "";
     });
+    applyTechnologyServiceCost();
     document.querySelector("#save-status").textContent = "";
     formatCurrencyFields();
     recalculate();
@@ -665,18 +719,27 @@
   function recalculate() {
     const material = formNumber("custo_mat");
     const labor = formNumber("custo_mo");
-    const technicians = formNumber("qtde_tecnicos");
-    const days = formNumber("qtde_dias");
-    const dailyRate = Number(listState.options.default_daily_rate || 0);
-    const teamCost = dailyRate * technicians * days;
     const total = material + labor;
     document.querySelector("#calc-total").value = money.format(total);
     document.querySelector("#calc-total").textContent = money.format(total);
     document.querySelector("#calc-avoided").value = money.format(labor);
     document.querySelector("#calc-avoided").textContent = money.format(labor);
     document.querySelector("#edit-form").elements.custo_evitado.value = labor.toFixed(2);
-    setGapIndicator(document.querySelector("#calc-gap"), labor - teamCost);
-    document.querySelector("#calc-gap-detail").textContent = `Equipe: ${money.format(dailyRate)} × ${number.format(technicians)} técnico(s) × ${number.format(days)} dia(s)`;
+    const gap = document.querySelector("#calc-gap");
+    gap.classList.remove("is-positive", "is-negative");
+    gap.classList.add("is-neutral");
+    gap.textContent = "Por categoria";
+    gap.setAttribute("aria-label", "GAP calculado por categoria no Dashboard");
+    document.querySelector("#calc-gap-detail").textContent = "Serviços menos o valor mensal da equipe configurada.";
+  }
+
+  function applyTechnologyServiceCost() {
+    const technology = document.querySelector("#form-technology");
+    const selected = technology?.selectedOptions?.[0];
+    if (!selected || !technology.value || selected.dataset.serviceCost === undefined) return;
+    const labor = document.querySelector("#edit-form").elements.custo_mo;
+    labor.value = currencyNumber.format(Number(selected.dataset.serviceCost || 0));
+    recalculate();
   }
 
   function setupModal() {
@@ -694,6 +757,7 @@
       const option = event.target.selectedOptions[0];
       if (option?.dataset.registration) document.querySelector("#form-registration").value = option.dataset.registration;
     });
+    document.querySelector("#form-technology").addEventListener("change", applyTechnologyServiceCost);
     document.querySelectorAll("[data-modal-close]").forEach((button) => button.addEventListener("click", closeModal));
     document.querySelector("#edit-modal").addEventListener("click", (event) => {
       if (event.target === event.currentTarget) closeModal();
@@ -1138,7 +1202,7 @@
       const activityId = serviceCalculatorState.activity.id;
       saveButton.disabled = true;
       saveButton.textContent = "Salvando…";
-      status.textContent = "Atualizando materiais, M.O. e a memória do cálculo…";
+      status.textContent = "Atualizando materiais, serviços e a memória do cálculo…";
       try {
         const result = await getJson(`/api/service-calculation?activity=${encodeURIComponent(reference)}`, {
           method: "POST",
@@ -1154,7 +1218,7 @@
         closeServiceCalculator();
         listState.filtersLoaded = false;
         await loadActivities();
-        toast("Cálculo salvo", `Atividade ${activityId}: materiais ${money.format(result.material_total || 0)} e M.O. ${money.format(result.labor_total || 0)}.`);
+        toast("Cálculo salvo", `Atividade ${activityId}: materiais ${money.format(result.material_total || 0)} e serviços ${money.format(result.labor_total || 0)}.`);
       } catch (error) {
         status.textContent = error.message;
         toast("Não foi possível salvar o cálculo", error.message, true);
@@ -1175,6 +1239,15 @@
   };
 
   function catalogRow(key, item = "") {
+    if (key === "technologies") {
+      const technology = item && typeof item === "object" ? item : { name: item, service_cost: 0 };
+      return `
+        <div class="catalog-row catalog-row--technology" data-catalog-row>
+          <input class="catalog-input" data-catalog-field="name" value="${escapeHtml(technology.name || "")}" maxlength="160" aria-label="Tecnologia" placeholder="Ex.: GPON" required>
+          <div class="catalog-money"><span>R$</span><input class="catalog-input" data-catalog-field="service_cost" type="number" min="0" step="0.01" inputmode="decimal" value="${escapeHtml(Number(technology.service_cost || 0).toFixed(2))}" aria-label="Valor do serviço para ${escapeHtml(technology.name || "a tecnologia")}" required></div>
+          <button class="icon-button icon-button--bordered catalog-remove" type="button" data-catalog-remove aria-label="Excluir tecnologia" title="Excluir tecnologia">${iconTrash}</button>
+        </div>`;
+    }
     if (key === "technicians") {
       const technician = item && typeof item === "object" ? item : {};
       return `
@@ -1250,16 +1323,29 @@
     document.querySelector("#monthly-technician-cost").value = Number(settings.monthly_technician_cost || 0).toFixed(2);
     document.querySelector("#business-days").value = Number(settings.business_days || 0);
     document.querySelector("#calculation-status").textContent = settings.calculation_status;
+    const teams = Object.fromEntries((settings.category_teams || []).map((item) => [item.category, Number(item.technicians || 0)]));
+    ["implantacao", "reparo", "ativacao"].forEach((category) => {
+      const input = document.querySelector(`#category-team-${category}`);
+      if (input) input.value = teams[category] || 0;
+    });
     document.querySelector("#upload-directory").textContent = settings.upload_directory || "—";
     settingsState.uploads = settings.uploads || { services: {}, materials: {} };
     renderUpload("services", settingsState.uploads.services);
     renderUpload("materials", settingsState.uploads.materials);
     recalculateDailyRate();
-    Object.keys(catalogDefinitions).forEach((key) => renderCatalog(key, settings[key]));
+    Object.keys(catalogDefinitions).forEach((key) => {
+      renderCatalog(key, key === "technologies" ? settings.technology_rates : settings[key]);
+    });
   }
 
   function collectCatalog(key) {
     const rows = [...document.querySelectorAll(`#${key}-catalog [data-catalog-row]`)];
+    if (key === "technologies") {
+      return rows.map((row) => ({
+        name: row.querySelector('[data-catalog-field="name"]').value.trim(),
+        service_cost: Number(row.querySelector('[data-catalog-field="service_cost"]').value || 0),
+      }));
+    }
     if (key === "technicians") {
       return rows.map((row) => ({
         registration: row.querySelector('[data-catalog-field="registration"]').value.trim(),
@@ -1428,7 +1514,11 @@
             business_days: Number(document.querySelector("#business-days").value || 0),
             statuses: collectCatalog("statuses"),
             types: collectCatalog("types"),
-            technologies: collectCatalog("technologies"),
+            technology_rates: collectCatalog("technologies"),
+            category_teams: ["implantacao", "reparo", "ativacao"].map((category) => ({
+              category,
+              technicians: Number(document.querySelector(`#category-team-${category}`).value || 0),
+            })),
             technicians: collectCatalog("technicians"),
             companies: collectCatalog("companies"),
             eps: collectCatalog("eps"),

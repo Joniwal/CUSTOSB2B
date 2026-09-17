@@ -81,6 +81,11 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(data["charts"]["by_type"][0]["gap"], 200)
         self.assertEqual([item["label"] for item in data["charts"]["by_technology"]], ["GPON"])
         self.assertEqual(data["filters"]["technologies"], ["B2B", "GPON"])
+        categories = {item["key"]: item for item in data["category_kpis"]}
+        self.assertEqual(categories["reparo"]["service"], 300)
+        self.assertEqual(categories["reparo"]["material"], 30)
+        self.assertEqual(categories["reparo"]["gap"], 300)
+        self.assertEqual(categories["reparo"]["trends"]["service"]["previous"], 150)
 
     def test_list_technology_and_draft_search_and_sort(self):
         data = self.get_json("/api/activities?technology=GPON&q=RASCUNHO-1&sort=draft")

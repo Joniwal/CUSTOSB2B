@@ -10,9 +10,10 @@ O sistema combina a leitura limpa da referência tabular com o caráter compacto
 - Sidebar fixa de 244 px com Dashboard, Atividades e atalhos por status.
 - Cabeçalho de página com contexto, horário de atualização e ação principal.
 - Filtros por mês ou datas e tecnologia, iniciados no mês vigente. Em notebook, o texto comparativo fica abaixo dos controles, sem sobreposição.
-- Quatro cartões de métrica: Custo M.O, Custo Material, Custo Total e GAP, com comparação do período anterior.
+- Quatro cartões de métrica: Custo Serviços, Custo Material, Custo Total e GAP, com comparação do período anterior.
+- Três blocos por categoria — Implantação, Reparo e Ativação — com Serviços, Materiais, Custo Total, GAP, técnicos e valor mensal da equipe. Os ícones são diferentes dos KPIs superiores.
 - Grade de gráficos por tipo de atividade, técnico e empresa, com seletor de quantidade, custo ou GAP.
-- Tabelas de resumo por tipo de atividade e tecnologia: quantidade, total de M.O e total de GAP, respeitando o período e a tecnologia selecionados.
+- Tabelas de resumo por tipo de atividade e tecnologia: quantidade, total de Serviços e total de GAP, respeitando o período e a tecnologia selecionados.
 - Conteúdo limitado a 1460 px para manter densidade e comprimento de linha controlados.
 
 ### Listagem — desktop
@@ -27,11 +28,11 @@ O sistema combina a leitura limpa da referência tabular com o caráter compacto
 
 ### Modal de edição
 
-Os campos são agrupados por tarefa: identificação, empresa/equipe e custos da atividade. O bloco financeiro exibe Custo M.O, Custo Material, Custo Total, Custo Evitado e GAP. Os valores são apresentados em moeda com duas casas decimais; Custo Evitado acompanha automaticamente Custo M.O. O GAP equivale a `Custo M.O − (valor técnico/dia × técnicos × dias)` e usa seta verde, vermelha ou neutra conforme o sinal. Os demais campos financeiros históricos não aparecem no formulário e são preservados na edição. O modal usa foco inicial, fechamento por `Esc`, rótulos visíveis e botões consistentes.
+Os campos são agrupados por tarefa: identificação, empresa/equipe e custos da atividade. “Ganho esperado / importância” foi substituído por uma lista de Tecnologia. A opção escolhida traz o valor cadastrado em Configurações para Custo Serviço e atualiza o Custo Total. O formulário comum não calcula valor técnico/dia × técnicos × dias; o GAP é apresentado como consolidado por categoria no Dashboard. O modal usa foco inicial, fechamento por `Esc`, rótulos visíveis e uma variação compacta que cabe sem rolagem em 1366 × 768.
 
 ### Calculadora de materiais e serviços
 
-Cada linha da listagem começa com um botão de calculadora. A modal inicia na aba Materiais: catálogo pesquisável, seleção, quantidade e novo custo de material. A aba Serviços e equipe recebe esse total e apresenta catálogo, itens escolhidos com quantidade inteira/subtotal e resumo do novo Custo M.O. O resumo possui campos inteiros para técnicos e dias, recalcula o custo padrão da equipe em tempo real e apresenta o GAP com seta/cor. No desktop, o painel de totais usa uma grade compacta, com números tabulares e sem rolagem interna em alturas usuais. Em telas muito baixas a rolagem permanece como proteção para não esconder campos. No tablet, o resumo ocupa uma faixa inferior; no celular, os blocos são empilhados. Salvar recalcula o custo da linha exata e mantém a memória nas abas `Calculo_Materiais` e `Calculo_Servicos`. Sem serviços, o custo padrão da equipe é exibido, o GAP fica neutro e o cálculo pode ser salvo normalmente.
+Cada linha da listagem começa com um botão de calculadora. A modal inicia na aba Materiais: catálogo pesquisável, seleção, quantidade e novo custo de material. A aba Serviços e equipe recebe esse total e apresenta catálogo, itens escolhidos com quantidade inteira/subtotal e resumo do novo Total de Serviços. O resumo possui campos inteiros para técnicos e dias, recalcula o custo padrão da equipe em tempo real e apresenta o GAP com seta/cor. No desktop, o painel de totais usa uma grade compacta, com números tabulares e sem rolagem interna em alturas usuais. Em telas muito baixas a rolagem permanece como proteção para não esconder campos. No tablet, o resumo ocupa uma faixa inferior; no celular, os blocos são empilhados. Salvar recalcula o custo da linha exata e mantém a memória nas abas `Calculo_Materiais` e `Calculo_Servicos`. Sem serviços, o custo padrão da equipe é exibido, o GAP fica neutro e o cálculo pode ser salvo normalmente.
 
 ### Mobile
 
@@ -83,7 +84,8 @@ O texto escuro usado sobre `#DD7FD4` evita depender de branco com contraste baix
 |---|---|
 | Topbar | Fixa, com cor obrigatória e estado de sincronização |
 | Sidebar | Fixa no desktop; drawer com overlay no mobile |
-| Card de métrica | Custo M.O, Material, Total e GAP com comparação ao período anterior |
+| Card de métrica | Custo Serviços, Material, Total e GAP com comparação ao período anterior |
+| Bloco por categoria | Implantação, Reparo e Ativação com quatro indicadores e custo mensal da equipe |
 | Painel | Cabeçalho padrão, conteúdo e borda leve |
 | Tabela | Cabeçalho ordenável, hover, seleção, estado inativo e ação por linha |
 | Badge | Variantes `success`, `warning`, `error`, `info` e `neutral` |
@@ -92,7 +94,7 @@ O texto escuro usado sobre `#DD7FD4` evita depender de branco com contraste baix
 | Modal | Inclusão/edição em três seções, opções lidas do Excel e total calculado ao digitar |
 | Calculadora de serviços | Botão por linha, catálogo pesquisável, inclusão por `+`, quantidade, remoção, total e persistência vinculada à atividade |
 | Gráfico analítico | Ranking por tipo, técnico e empresa com quantidade, custo ou GAP |
-| Configurações | Login administrativo, custo mensal/dias úteis, cadastros editáveis e upload das bases de Serviços e Materiais |
+| Configurações | Login administrativo, custo mensal/dias úteis, equipes por categoria, tecnologias com valor, cadastros editáveis e upload das bases de Serviços e Materiais |
 | Toast | Confirmação ou erro com região `aria-live` |
 | Estado vazio | Mensagem objetiva sem quebrar a estrutura da tabela |
 | Atualizar | Relê dashboard ou listagem diretamente do Excel e mostra progresso |

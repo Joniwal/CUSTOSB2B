@@ -18,6 +18,7 @@ from excel_repository import (  # noqa: E402
     discover_excel_file,
     normalize_activity,
     summarize_activities,
+    summarize_service_categories,
 )
 from app import load_env  # noqa: E402
 
@@ -92,6 +93,30 @@ class CalculationTests(unittest.TestCase):
         self.assertIn('id="service-days"', html)
         self.assertIn('name="draft"', html)
         self.assertIn('id="export-button"', html)
+        self.assertIn('id="form-technology"', html)
+        self.assertIn('Custo Serviço', html)
+        self.assertNotIn('name="ganho_esperado"', html)
+        self.assertNotIn('valor técnico/dia × técnicos × dias neste formulário', html)
+
+    def test_category_summary_uses_configured_monthly_team_values(self):
+        rows = [
+            {"tipo_atividade": "IMPLANTAÇÃO", "custo_mo": 4_000, "custo_mat": 500},
+            {"tipo_atividade": "REPARO B2B", "custo_mo": 2_500, "custo_mat": 250},
+            {"tipo_atividade": "ATIVAÇÃO B2B", "custo_mo": 7_000, "custo_mat": 700},
+        ]
+        settings = {
+            "monthly_technician_cost": 15_000,
+            "category_teams": [
+                {"category": "implantacao", "technicians": 2},
+                {"category": "reparo", "technicians": 1},
+                {"category": "ativacao", "technicians": 3},
+            ],
+        }
+        categories = {item["key"]: item for item in summarize_service_categories(rows, settings)}
+        self.assertEqual(categories["implantacao"]["team_value"], 30_000)
+        self.assertEqual(categories["implantacao"]["gap"], -26_000)
+        self.assertEqual(categories["reparo"]["total"], 2_750)
+        self.assertEqual(categories["ativacao"]["technicians"], 3)
 
     def test_service_catalog_accepts_blank_codes(self):
         import openpyxl
@@ -927,8 +952,63 @@ class CalculationTests(unittest.TestCase):
             self.assertEqual(sheet["I2"].value, 3)
             self.assertEqual(sheet["N2"].value, "=H2+J2")
             self.assertEqual(sheet["P2"].value, 75)
-            self.assertEqual(sheet["Q2"].value, "=J2-(K2*L2*M2)")
+            self.assertEqual(sheet["Q2"].value, 0)
             workbook.close()
+
+    def test_technology_value_populates_generic_activity_without_daily_team_formula(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            data_dir = temp_root / "data"
+            data_dir.mkdir()
+            workbook_path = data_dir / "B2B_CTACUSTOS.xlsx"
+            create_test_activity_workbook(workbook_path)
+
+            with patch.dict(
+                os.environ,
+                {
+                    "EXCEL_SEARCH_ROOTS": "data",
+                    "EXCEL_FILENAME": workbook_path.name,
+                    "EXCEL_SHEET_NAME": "Atividades",
+                    "EXCEL_FALLBACK_SAMPLE": "false",
+                },
+                clear=False,
+            ):
+                os.environ.pop("EXCEL_PATH", None)
+                repository = LocalExcelRepository(temp_root)
+                repository.save_settings(
+                    {
+                        "reference_month": "2026-09",
+                        "monthly_technician_cost": 15_000,
+                        "business_days": 22,
+                        "statuses": ["NOVO"],
+                        "types": ["IMPLANTAÇÃO", "REPARO", "ATIVAÇÃO"],
+                        "technology_rates": [{"name": "GPON", "service_cost": 1_250}],
+                        "category_teams": [
+                            {"category": "implantacao", "technicians": 2},
+                            {"category": "reparo", "technicians": 1},
+                            {"category": "ativacao", "technicians": 3},
+                        ],
+                        "technicians": [],
+                        "companies": [],
+                        "eps": [],
+                    }
+                )
+                created = repository.create_activity(
+                    {
+                        "tipo_atividade": "IMPLANTAÇÃO",
+                        "status": "NOVO",
+                        "situacao": "TESTE",
+                        "tecnologia": "GPON",
+                        "custo_mo": 999,
+                        "custo_mat": 50,
+                        "qtde_tecnicos": 4,
+                        "qtde_dias": 3,
+                    }
+                )
+
+            self.assertEqual(created["custo_mo"], 1_250)
+            self.assertEqual(created["custo_total"], 1_300)
+            self.assertEqual(created["gap"], 0)
 
     def test_reference_workbook_upload_is_saved_beside_main_excel(self):
         with tempfile.TemporaryDirectory() as temp_dir:

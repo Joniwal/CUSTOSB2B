@@ -8,7 +8,7 @@
   <title>Dashboard · B2B CTACUSTOS</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="alternate icon" href="/favicon.ico">
-  <link rel="stylesheet" href="/static/app.css?v=20260915-1">
+  <link rel="stylesheet" href="/static/app.css?v=20260916-1">
 </head>
 <body data-page="dashboard">
   <a class="skip-link" href="#conteudo">Ir para o conteúdo principal</a>
@@ -126,7 +126,7 @@
       <section class="metrics-grid" aria-label="Indicadores financeiros comparativos">
         <article class="metric-card metric-card--rose">
           <div class="metric-card__icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 18h16M7 15V9M12 15V5M17 15v-3"/></svg></div>
-          <div><p>Custo M.O</p><strong id="kpi-labor">—</strong><span class="metric-card__trend" id="trend-labor">—</span></div>
+          <div><p>Custo Serviços</p><strong id="kpi-labor">—</strong><span class="metric-card__trend" id="trend-labor">—</span></div>
         </article>
         <article class="metric-card metric-card--amber">
           <div class="metric-card__icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m4 8 8-4 8 4-8 4-8-4Z"/><path d="m4 12 8 4 8-4M4 16l8 4 8-4"/></svg></div>
@@ -140,6 +140,18 @@
           <div class="metric-card__icon"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="m5 14 4-4 3 3 7-7"/><path d="M14 6h5v5"/></svg></div>
           <div><p>GAP</p><strong id="kpi-gap">—</strong><span class="metric-card__trend" id="trend-gap">—</span></div>
         </article>
+      </section>
+
+      <section class="category-overview" aria-labelledby="category-overview-title">
+        <header class="category-overview__header">
+          <div><p class="eyebrow">Resultado por categoria</p><h2 id="category-overview-title">Implantação, Reparo e Ativação</h2></div>
+          <p>O GAP compara o total de serviços com o valor mensal da equipe configurada para cada categoria.</p>
+        </header>
+        <div class="category-kpi-groups" id="category-kpi-groups" aria-live="polite">
+          <div class="skeleton skeleton--category"></div>
+          <div class="skeleton skeleton--category"></div>
+          <div class="skeleton skeleton--category"></div>
+        </div>
       </section>
 
       <section class="dashboard-grid dashboard-grid--analytics">
@@ -169,7 +181,7 @@
 
         <article class="panel panel--summaries">
           <header class="panel__header">
-            <div><p class="eyebrow">Período selecionado</p><h2>Totais de M.O e GAP</h2></div>
+            <div><p class="eyebrow">Período selecionado</p><h2>Totais de Serviços e GAP</h2></div>
             <a class="text-link" href="/atividades">Lista completa</a>
           </header>
           <div class="summary-tables">
@@ -177,8 +189,8 @@
               <h3 id="summary-type-title">Por tipo de atividade</h3>
               <div class="table-wrap">
                 <table class="data-table data-table--compact data-table--summary">
-                  <caption class="sr-only">Totais de mão de obra e GAP por tipo de atividade</caption>
-                  <thead><tr><th scope="col">Tipo de atividade</th><th scope="col">Custo M.O</th><th scope="col">GAP</th></tr></thead>
+                  <caption class="sr-only">Totais de serviços e GAP por tipo de atividade</caption>
+                  <thead><tr><th scope="col">Tipo de atividade</th><th scope="col">Serviços</th><th scope="col">GAP</th></tr></thead>
                   <tbody id="summary-by-type"><tr><td colspan="3"><div class="skeleton skeleton--row"></div></td></tr></tbody>
                 </table>
               </div>
@@ -187,8 +199,8 @@
               <h3 id="summary-technology-title">Por tecnologia</h3>
               <div class="table-wrap">
                 <table class="data-table data-table--compact data-table--summary">
-                  <caption class="sr-only">Totais de mão de obra e GAP por tecnologia</caption>
-                  <thead><tr><th scope="col">Tecnologia</th><th scope="col">Custo M.O</th><th scope="col">GAP</th></tr></thead>
+                  <caption class="sr-only">Totais de serviços e GAP por tecnologia</caption>
+                  <thead><tr><th scope="col">Tecnologia</th><th scope="col">Serviços</th><th scope="col">GAP</th></tr></thead>
                   <tbody id="summary-by-technology"><tr><td colspan="3"><div class="skeleton skeleton--row"></div></td></tr></tbody>
                 </table>
               </div>
@@ -201,6 +213,6 @@
   </div>
 
   <div class="toast-region" id="toast-region" role="status" aria-live="polite"></div>
-  <script src="/static/app.js?v=20260915-1" defer></script>
+  <script src="/static/app.js?v=20260916-1" defer></script>
 </body>
 </html>

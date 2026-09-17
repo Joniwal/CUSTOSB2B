@@ -6,16 +6,17 @@ Aplicação local e responsiva para consultar e editar atividades armazenadas em
 
 - Dashboard iniciado sempre no mês atual, com seleção por mês, intervalo de datas e tecnologia.
 - Comparação automática com o mês anterior ou com o intervalo anterior de mesma duração.
-- KPIs de Custo M.O, Custo Material, Custo Total e GAP.
+- KPIs de Custo Serviços, Custo Material, Custo Total e GAP.
+- Blocos mensais de Implantação, Reparo e Ativação, cada um com Serviços, Materiais, Custo Total, GAP, quantidade de técnicos e valor da equipe.
 - Gráficos por tipo de atividade, técnico e empresa, alternando quantidade, custo e GAP.
-- Tabelas de resumo por tipo de atividade e tecnologia, com totais de Custo M.O e GAP do período filtrado.
+- Tabelas de resumo por tipo de atividade e tecnologia, com totais de Serviços e GAP do período filtrado.
 - Exportar Excel na página Atividades, preservando estilos e a tabela, sem a coluna DRAFT.
 - Campo DRAFT ao final da listagem e nos formulários de inclusão e edição.
 - Inclusão e edição pelo mesmo formulário, com opções de status, empresa, EPS e técnico administradas no próprio aplicativo.
 - Calculadora em duas abas, Materiais e Serviços, aberta pelo ícone antes de cada atividade e já vinculada ao registro correto.
-- Catálogos lidos de `MATERIAL.xlsx` e `SERVICOS.xlsx`, com seleção de itens, quantidades, subtotais, total de material e total de M.O.
-- Página Configurações protegida por login, com custo mensal, mês, dias úteis e cálculo automático do custo técnico/dia.
-- Cadastros para incluir, alterar ou excluir Status, Tipos de atividade, Tecnologias, Técnicos, Empresas e EPS, salvos na aba `Config`.
+- Catálogos lidos de `MATERIAL.xlsx` e `SERVICOS.xlsx`, com seleção de itens, quantidades, subtotais, total de material e total de serviços.
+- Página Configurações protegida por login, com custo mensal, mês, dias úteis, total de técnicos por categoria e cálculo automático do custo técnico/dia.
+- Cadastros para incluir, alterar ou excluir Status, Tipos de atividade, Tecnologias com valor de serviço, Técnicos, Empresas e EPS, salvos na aba `Config`.
 - Upload local de planilhas `.xlsx` ou `.xlsm` de Serviços e Materiais para uma pasta sincronizada pelo OneDrive, sem Microsoft Graph.
 - Botões Atualizar e Encerrar em todas as áreas principais.
 
@@ -100,19 +101,20 @@ Os nomes podem variar em acentos, espaços ou pontuação, mas os quatro primeir
 
 ```text
 Custo de materiais = Custo Material consolidado
-Custo de mão de obra = Custo M.O consolidado
-Custo Total = Custo Material + Custo M.O
-Custo Evitado = Custo M.O
-GAP = Custo M.O − (Custo técnico/dia × Qtde técnicos × Qtde dias)
+Custo de serviços = valor cadastrado para a tecnologia escolhida
+Custo Total = Custo Material + Custo Serviços
+Custo Evitado = Custo Serviços
+Valor mensal da equipe da categoria = Custo mensal do técnico × Total de técnicos da categoria
+GAP da categoria = Total de Serviços da categoria − Valor mensal da equipe da categoria
 ```
 
-O bloco financeiro da modal exibe `Custo M.O`, `Custo Material`, `Custo Total`, `Custo Evitado` e `GAP`. Os valores monetários usam duas casas decimais. `Custo Evitado` acompanha automaticamente `Custo M.O`; o GAP compara o Custo M.O com o custo padrão da equipe e usa seta/cor para indicar resultado positivo, negativo ou neutro. Não exibe Material Utilizado, Código do Material, Quantidade de Material, Serviço M.O, Quantidade de Serviço, Custo Técnico / Dia nem Custo por Técnico. Ao editar, os demais valores históricos ocultos são preservados. O backend repete o cálculo antes de salvar. No Excel local, `Custo Total`, `Custo por Técnico` e `GAP` continuam sendo gravados como fórmulas quando essas colunas existem.
+O formulário comum de inclusão e edição usa uma lista de tecnologias administrada em Configurações. Ao escolher uma tecnologia, o valor correspondente preenche `Custo Serviço`, e `Custo Total` soma esse valor ao material. O formulário não calcula técnicos × dias: o GAP é consolidado no Dashboard por Implantação, Reparo e Ativação. Os campos técnicos históricos ocultos são preservados nas edições. A calculadora detalhada de materiais e serviços mantém sua própria regra de equipe e memória de itens.
 
 O custo diário padrão é calculado por `Custo mensal do técnico ÷ Dias úteis do mês`. O valor inicial é R$ 15.000,00 e a contagem automática considera segunda a sexta; os dias úteis podem ser ajustados manualmente para feriados.
 
 ### Calculadora de materiais e serviços
 
-Na página Atividades, o botão de calculadora aparece antes do ID. A primeira aba apresenta o catálogo de materiais, os itens escolhidos e o novo Custo Material. A segunda aba recebe esse total, apresenta os serviços e o novo total de M.O. O painel permite informar técnicos e dias, atualiza `custo técnico/dia × técnicos × dias` imediatamente e mostra `GAP = M.O. − custo da equipe` com indicação visual. Quantidades de materiais aceitam frações; quantidades de serviços aceitam apenas inteiros como `1`, `2`, `1000` ou `3000`. Ao salvar:
+Na página Atividades, o botão de calculadora aparece antes do ID. A primeira aba apresenta o catálogo de materiais, os itens escolhidos e o novo Custo Material. A segunda aba recebe esse total, apresenta os serviços e o novo Total de Serviços. O painel detalhado permite informar técnicos e dias, atualiza `custo técnico/dia × técnicos × dias` imediatamente e mostra `GAP = Serviços − custo da equipe` com indicação visual. Quantidades de materiais aceitam frações; quantidades de serviços aceitam apenas inteiros como `1`, `2`, `1000` ou `3000`. Ao salvar:
 
 1. `Custo Material` recebe a soma dos materiais e os campos descritivos da base são consolidados.
 2. `Custo MO` recebe a soma dos serviços ou, sem serviços, o custo padrão da equipe.
@@ -142,7 +144,7 @@ O resultado fica em `dist/B2B_CTACUSTOS/`. O ícone `web/static/favicon.ico` é 
 - `POST /api/activities`: inclui uma atividade e amplia a tabela formatada do Excel.
 - `PUT /api/activities/{referência}`: valida e atualiza a linha exata da atividade.
 - `GET /api/service-calculation?activity={referência}`: carrega catálogo, atividade e cálculo já salvo.
-- `POST /api/service-calculation?activity={referência}`: salva os itens, atualiza Custo M.O. e recalcula Custo Total.
+- `POST /api/service-calculation?activity={referência}`: salva os itens, atualiza o Custo Serviço na coluna compatível do Excel e recalcula Custo Total.
 - `POST /api/admin/login` e `POST /api/admin/logout`: controlam a sessão administrativa local.
 - `GET/POST /api/settings`: consulta ou salva indicadores e cadastros; exige login administrativo.
 - `POST /api/admin/upload`: salva uma planilha auxiliar de Serviços ou Materiais; exige login administrativo.

@@ -19,7 +19,13 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
-from excel_repository import RepositoryError, activity_date, build_repository, summarize_activities
+from excel_repository import (
+    RepositoryError,
+    activity_date,
+    build_repository,
+    summarize_activities,
+    summarize_service_categories,
+)
 
 
 APP_NAME = "B2B CTACUSTOS"
@@ -116,7 +122,7 @@ def _period_items(activities: list[dict], start: date, end: date) -> list[dict]:
 
 def _kpi_comparison(current: dict, previous: dict) -> list[dict]:
     definitions = (
-        ("custo_mo", "Custo M.O"),
+        ("custo_mo", "Custo Serviços"),
         ("custo_material", "Custo Material"),
         ("custo_total", "Custo total"),
         ("gap", "GAP"),
@@ -137,6 +143,33 @@ def _kpi_comparison(current: dict, previous: dict) -> list[dict]:
                 "change_percent": change,
             }
         )
+    return result
+
+
+def _category_comparison(current: list[dict], previous: list[dict]) -> list[dict]:
+    previous_by_key = {item["key"]: item for item in previous}
+    labels = {
+        "service": "Serviços",
+        "material": "Materiais",
+        "total": "Custo total",
+        "gap": "GAP",
+    }
+    result = []
+    for item in current:
+        prior = previous_by_key.get(item["key"], {})
+        trends = {}
+        for key, label in labels.items():
+            current_value = float(item.get(key, 0) or 0)
+            previous_value = float(prior.get(key, 0) or 0)
+            delta = current_value - previous_value
+            trends[key] = {
+                "key": key,
+                "label": label,
+                "previous": round(previous_value, 2),
+                "delta": round(delta, 2),
+                "change_percent": None if previous_value == 0 else round(delta / abs(previous_value) * 100, 1),
+            }
+        result.append({**item, "trends": trends})
     return result
 
 
@@ -487,7 +520,13 @@ class RequestHandler(BaseHTTPRequestHandler):
                 ]
             payload = summarize_activities(current_items)
             previous = summarize_activities(previous_items)
+            settings = self.server.repository.get_settings()
+            current_categories = summarize_service_categories(current_items, settings)
+            previous_categories = summarize_service_categories(previous_items, settings)
+            payload["financial"]["gap"] = round(sum(item["gap"] for item in current_categories), 2)
+            previous["financial"]["gap"] = round(sum(item["gap"] for item in previous_categories), 2)
             payload["kpis"] = _kpi_comparison(payload["financial"], previous["financial"])
+            payload["category_kpis"] = _category_comparison(current_categories, previous_categories)
             payload["period"] = {
                 key: value.isoformat() if isinstance(value, date) else value
                 for key, value in period.items()
