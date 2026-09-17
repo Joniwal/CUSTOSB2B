@@ -193,7 +193,7 @@
             <label class="input-group"><span>Matrícula</span><input name="matricula" id="form-registration" maxlength="60"></label>
             <label class="input-group"><span>Região</span><input name="regiao" list="region-options" maxlength="80"><datalist id="region-options"></datalist></label>
             <label class="input-group"><span>Cluster</span><input name="cluster" list="cluster-options" maxlength="80"><datalist id="cluster-options"></datalist></label>
-            <label class="input-group input-group--wide"><span>Tecnologia</span><select name="tecnologia" id="form-technology"><option value="">Selecione</option></select><small>O valor configurado será aplicado automaticamente ao Custo Serviço.</small></label>
+            <label class="input-group input-group--wide"><span>Tecnologia</span><select name="tecnologia" id="form-technology"><option value="">Selecione</option></select><small>O valor configurado será aplicado automaticamente. Para ERB, informe o valor obtido na calculadora externa.</small></label>
             <label class="input-group input-group--wide"><span>DRAFT</span><input name="draft" maxlength="180" placeholder="Informe o DRAFT, quando aplicável"></label>
           </div>
         </div>
@@ -201,7 +201,7 @@
         <div class="form-section form-section--results">
           <div class="form-section__heading"><span>3</span><div><h3>Custos da atividade</h3><p>Valores consolidados que serão fornecidos pela calculadora.</p></div></div>
           <div class="form-grid form-grid--five">
-            <label class="input-group"><span>Custo Serviço</span><div class="money-input"><span>R$</span><input name="custo_mo" type="text" inputmode="decimal" data-currency-input autocomplete="off" readonly></div></label>
+            <label class="input-group" id="service-cost-field"><span>Custo Serviço</span><div class="money-input"><span>R$</span><input name="custo_mo" id="form-service-cost" type="text" inputmode="decimal" data-currency-input autocomplete="off" aria-describedby="service-cost-hint" readonly></div><small id="service-cost-hint">Preenchido automaticamente conforme a tecnologia.</small></label>
             <label class="input-group"><span>Custo Material</span><div class="money-input"><span>R$</span><input name="custo_mat" type="text" inputmode="decimal" data-currency-input autocomplete="off"></div></label>
             <label class="input-group"><span>Custo Total</span><output class="calculated-output" id="calc-total">R$ 0,00</output></label>
             <label class="input-group"><span>Custo Evitado</span><output class="calculated-output" id="calc-avoided">R$ 0,00</output><input name="custo_evitado" type="hidden" value="0"></label>

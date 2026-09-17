@@ -17,6 +17,7 @@ Aplicação local e responsiva para consultar e editar atividades armazenadas em
 - Catálogos lidos de `MATERIAL.xlsx` e `SERVICOS.xlsx`, com seleção de itens, quantidades, subtotais, total de material e total de serviços.
 - Página Configurações protegida por login, com custo mensal, mês, dias úteis, total de técnicos por categoria e cálculo automático do custo técnico/dia.
 - Cadastros para incluir, alterar ou excluir Status, Tipos de atividade, Tecnologias com valor de serviço, Técnicos, Empresas e EPS, salvos na aba `Config`.
+- Nos formulários de inclusão e edição, tecnologias configuradas preenchem o Custo Serviço automaticamente; ao selecionar `ERB`, o campo é liberado para receber o resultado de uma calculadora externa e o Custo Total é recalculado.
 - Upload local de planilhas `.xlsx` ou `.xlsm` de Serviços e Materiais para uma pasta sincronizada pelo OneDrive, sem Microsoft Graph.
 - Botões Atualizar e Encerrar em todas as áreas principais.
 

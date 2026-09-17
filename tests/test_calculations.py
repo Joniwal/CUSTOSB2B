@@ -77,9 +77,12 @@ class CalculationTests(unittest.TestCase):
 
     def test_activity_modal_has_only_requested_cost_fields(self):
         html = (PROJECT / "web" / "atividades.html").read_text(encoding="utf-8")
+        javascript = (PROJECT / "web" / "static" / "app.js").read_text(encoding="utf-8")
         for field in ("custo_mo", "custo_mat", "custo_evitado"):
             self.assertIn(f'name="{field}"', html)
         self.assertIn('id="calc-total"', html)
+        self.assertIn('id="form-service-cost"', html)
+        self.assertIn('normalize(technology?.value).trim() === "erb"', javascript)
         for field in ("quantidade", "servico_mo", "custo_tecnico_dia"):
             self.assertNotIn(f'name="{field}"', html)
         self.assertIn('id="calc-gap"', html)
@@ -1061,6 +1064,55 @@ class CalculationTests(unittest.TestCase):
             self.assertEqual(created["custo_mo"], 1_250)
             self.assertEqual(created["custo_total"], 1_300)
             self.assertEqual(created["gap"], 0)
+
+    def test_erb_preserves_service_cost_from_external_calculator(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            data_dir = temp_root / "data"
+            data_dir.mkdir()
+            workbook_path = data_dir / "B2B_CTACUSTOS.xlsx"
+            create_test_activity_workbook(workbook_path)
+
+            with patch.dict(
+                os.environ,
+                {
+                    "EXCEL_SEARCH_ROOTS": "data",
+                    "EXCEL_FILENAME": workbook_path.name,
+                    "EXCEL_SHEET_NAME": "Atividades",
+                    "EXCEL_FALLBACK_SAMPLE": "false",
+                },
+                clear=False,
+            ):
+                os.environ.pop("EXCEL_PATH", None)
+                repository = LocalExcelRepository(temp_root)
+                repository.save_settings(
+                    {
+                        "reference_month": "2026-09",
+                        "monthly_technician_cost": 15_000,
+                        "business_days": 22,
+                        "statuses": ["NOVO"],
+                        "types": ["IMPLANTAÇÃO"],
+                        "technology_rates": [{"name": "ERB", "service_cost": 1_250}],
+                        "category_teams": [],
+                        "technicians": [],
+                        "companies": [],
+                        "eps": [],
+                    }
+                )
+                created = repository.create_activity(
+                    {
+                        "tipo_atividade": "IMPLANTAÇÃO",
+                        "status": "NOVO",
+                        "situacao": "CALCULADORA EXTERNA",
+                        "tecnologia": "ERB",
+                        "custo_mo": "777,50",
+                        "custo_mat": "22,50",
+                    }
+                )
+
+            self.assertEqual(created["custo_mo"], 777.5)
+            self.assertEqual(created["custo_evitado"], 777.5)
+            self.assertEqual(created["custo_total"], 800)
 
     def test_reference_workbook_upload_is_saved_beside_main_excel(self):
         with tempfile.TemporaryDirectory() as temp_dir:

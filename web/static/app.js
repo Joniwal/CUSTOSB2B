@@ -308,11 +308,21 @@
       ["total", "Custo total"],
       ["gap", "GAP"],
     ];
-    target.innerHTML = categories.map((category) => `
-      <article class="category-kpi-group">
+    target.innerHTML = categories.map((category) => {
+      const categoryKey = ["implantacao", "reparo", "ativacao"].includes(category.key) ? category.key : "other";
+      const activityCount = Number(category.activity_count || 0);
+      const technicianCount = Number(category.technicians || 0);
+      return `
+      <article class="category-kpi-group category-kpi-group--${categoryKey}">
         <header class="category-kpi-group__header">
-          <div><span>${escapeHtml(number.format(category.activity_count || 0))} atividade(s)</span><h3>${escapeHtml(category.label)}</h3></div>
-          <p><strong>${escapeHtml(number.format(category.technicians || 0))} técnico(s)</strong><span>Vlr. equipe: ${escapeHtml(money.format(category.team_value || 0))}</span></p>
+          <div class="category-kpi-group__identity">
+            <span class="category-kpi-group__marker" aria-hidden="true">${escapeHtml(String(category.label || "C").slice(0, 1).toUpperCase())}</span>
+            <div><span class="category-kpi-group__eyebrow">${escapeHtml(number.format(activityCount))} ${activityCount === 1 ? "atividade" : "atividades"}</span><h3>${escapeHtml(category.label)}</h3></div>
+          </div>
+          <div class="category-team-summary" aria-label="Equipe configurada para ${escapeHtml(category.label)}">
+            <div><span>Técnicos</span><strong>${escapeHtml(number.format(technicianCount))}</strong></div>
+            <div><span>Valor mensal da equipe</span><strong>${escapeHtml(money.format(category.team_value || 0))}</strong></div>
+          </div>
         </header>
         <div class="category-kpi-grid">
           ${metrics.map(([key, label]) => {
@@ -325,7 +335,8 @@
             </div>`;
           }).join("")}
         </div>
-      </article>`).join("");
+      </article>`;
+    }).join("");
   }
 
   function renderDashboardCharts() {
@@ -665,6 +676,7 @@
     document.querySelector("#modal-activity-id").textContent = "";
     document.querySelector("#save-button").textContent = "Incluir atividade";
     document.querySelector("#save-status").textContent = "";
+    applyTechnologyServiceCost();
     formatCurrencyFields();
     recalculate();
     showActivityModal();
@@ -686,7 +698,7 @@
       if (form.elements[field].tagName === "SELECT") ensureSelectValue(form.elements[field], activity[field]);
       else form.elements[field].value = activity[field] ?? "";
     });
-    applyTechnologyServiceCost();
+    applyTechnologyServiceCost({ preserveCurrent: true });
     document.querySelector("#save-status").textContent = "";
     formatCurrencyFields();
     recalculate();
@@ -733,11 +745,31 @@
     document.querySelector("#calc-gap-detail").textContent = "Serviços menos o valor mensal da equipe configurada.";
   }
 
-  function applyTechnologyServiceCost() {
+  function applyTechnologyServiceCost({ preserveCurrent = false } = {}) {
     const technology = document.querySelector("#form-technology");
     const selected = technology?.selectedOptions?.[0];
-    if (!selected || !technology.value || selected.dataset.serviceCost === undefined) return;
     const labor = document.querySelector("#edit-form").elements.custo_mo;
+    const field = document.querySelector("#service-cost-field");
+    const hint = document.querySelector("#service-cost-hint");
+    const isErb = normalize(technology?.value).trim() === "erb";
+
+    labor.readOnly = !isErb;
+    labor.setAttribute("aria-readonly", String(!isErb));
+    field?.classList.toggle("input-group--manual", isErb);
+
+    if (isErb) {
+      if (hint) hint.textContent = "Campo liberado para informar o valor da calculadora externa de ERB.";
+      if (!preserveCurrent) labor.value = currencyNumber.format(0);
+      recalculate();
+      return;
+    }
+
+    if (hint) hint.textContent = "Preenchido automaticamente conforme a tecnologia.";
+    if (!selected || !technology.value || selected.dataset.serviceCost === undefined) {
+      if (!preserveCurrent) labor.value = currencyNumber.format(0);
+      recalculate();
+      return;
+    }
     labor.value = currencyNumber.format(Number(selected.dataset.serviceCost || 0));
     recalculate();
   }
@@ -757,7 +789,7 @@
       const option = event.target.selectedOptions[0];
       if (option?.dataset.registration) document.querySelector("#form-registration").value = option.dataset.registration;
     });
-    document.querySelector("#form-technology").addEventListener("change", applyTechnologyServiceCost);
+    document.querySelector("#form-technology").addEventListener("change", () => applyTechnologyServiceCost());
     document.querySelectorAll("[data-modal-close]").forEach((button) => button.addEventListener("click", closeModal));
     document.querySelector("#edit-modal").addEventListener("click", (event) => {
       if (event.target === event.currentTarget) closeModal();

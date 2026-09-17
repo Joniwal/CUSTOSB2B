@@ -1580,7 +1580,10 @@ class LocalExcelRepository:
                     and item.get("configured", True) is not False
                 )
             }
-            if technology_key in rate_by_technology:
+            # ERB pode usar uma calculadora externa. Nesse caso, o valor
+            # informado no formulário deve ser preservado em vez de ser
+            # substituído pelo cadastro padrão da tecnologia.
+            if technology_key != normalize_header("ERB") and technology_key in rate_by_technology:
                 prepared_payload["custo_mo"] = rate_by_technology[technology_key]
         activity = validate_update(activity_id, prepared_payload, use_team_gap=use_team_gap)
         activity["calculation_mode"] = mode
