@@ -598,9 +598,14 @@ def _onedrive_registry_roots() -> list[Path]:
     return found
 
 
-def _onedrive_search_roots(base_dir: Path) -> list[Path]:
+def _onedrive_search_roots(
+    base_dir: Path,
+    *,
+    include_automatic_when_configured: bool = False,
+) -> list[Path]:
     """Use explicit roots or discover personal/corporate OneDrive mounts."""
     configured = os.getenv("EXCEL_SEARCH_ROOTS", "").strip()
+    configured_roots: list[Path] = []
     if configured:
         configured_parts = [raw.strip().strip('"') for raw in configured.split(os.pathsep) if raw.strip()]
         placeholder_tokens = ("seu_usuario", "sua empresa", "seu usuário", "<usuario>", "<usuário>")
@@ -619,10 +624,10 @@ def _onedrive_search_roots(base_dir: Path) -> list[Path]:
         for raw in configured_parts:
             path = Path(raw)
             candidates.append(path if path.is_absolute() else base_dir / path)
-        roots = _deduplicate_existing_directories(candidates)
-        if roots:
-            return roots
-        if configured_parts:
+        configured_roots = _deduplicate_existing_directories(candidates)
+        if configured_roots and not include_automatic_when_configured:
+            return configured_roots
+        if configured_parts and not configured_roots:
             log.warning(
                 "Nenhuma pasta de EXCEL_SEARCH_ROOTS existe neste computador; detectando o OneDrive automaticamente."
             )
@@ -637,7 +642,7 @@ def _onedrive_search_roots(base_dir: Path) -> list[Path]:
         candidates.extend(path for path in Path.home().glob("OneDrive*") if path.is_dir())
     except OSError:
         pass
-    return _deduplicate_existing_directories(candidates)
+    return _deduplicate_existing_directories([*configured_roots, *candidates])
 
 
 def _sample_fallback_enabled() -> bool:
@@ -704,6 +709,7 @@ def discover_excel_file(
     *,
     base_dir: Path,
     fallback_filenames: Iterable[str] = (),
+    include_automatic_roots: bool = False,
 ) -> Path:
     """Find one workbook by prioritized names in synchronized OneDrive folders."""
     filenames: list[str] = []
@@ -728,7 +734,10 @@ def discover_excel_file(
     if not filenames:
         raise RepositoryError("EXCEL_FILENAME deve informar um arquivo .xlsx ou .xlsm.")
 
-    roots = _onedrive_search_roots(base_dir)
+    roots = _onedrive_search_roots(
+        base_dir,
+        include_automatic_when_configured=include_automatic_roots,
+    )
     target_names = {name.casefold() for name in filenames}
     matches: dict[str, dict[str, Path]] = {name.casefold(): {} for name in filenames}
     ignored_directories = {".git", ".pytest_cache", "__pycache__", "node_modules", "backups", "_backups"}
@@ -848,8 +857,18 @@ class LocalExcelRepository:
 
     def _locate_reference_workbook(self, kind: str) -> Path:
         definitions = {
-            "services": ("SERVICES", "SERVICOS.xlsx", ("SERVIÇOS.xlsx",), "serviços"),
-            "materials": ("MATERIALS", "MATERIAL.xlsx", ("MATERIAIS.xlsx",), "materiais"),
+            "services": (
+                "SERVICES",
+                "SERVICOS.xlsx",
+                ("SERVIÇOS.xlsx", "SERVICOS.xlsm", "SERVIÇOS.xlsm"),
+                "serviços",
+            ),
+            "materials": (
+                "MATERIALS",
+                "MATERIAL.xlsx",
+                ("MATERIAIS.xlsx", "MATERIAL.xlsm", "MATERIAIS.xlsm"),
+                "materiais",
+            ),
         }
         if kind not in definitions:
             raise ValueError("Tipo de planilha de referência inválido.")
@@ -861,11 +880,16 @@ class LocalExcelRepository:
             if not path.is_absolute():
                 path = self.file_path.parent / path
             path = path.resolve()
-            if not path.is_file():
-                raise RepositoryError(f"Planilha de {label} não encontrada: {path}")
-            if path.suffix.casefold() not in {".xlsx", ".xlsm"}:
+            if path.is_file() and path.suffix.casefold() in {".xlsx", ".xlsm"}:
+                return path
+            if path.is_file():
                 raise RepositoryError(f"A planilha de {label} deve ser .xlsx ou .xlsm.")
-            return path
+            log.warning(
+                "%s_EXCEL_PATH aponta para um arquivo que não existe neste computador; "
+                "tentando a descoberta automática: %s",
+                prefix,
+                path,
+            )
 
         try:
             metadata = self.get_settings().get("uploads", {}).get(kind, {})
@@ -911,12 +935,15 @@ class LocalExcelRepository:
                 filename,
                 base_dir=self.base_dir,
                 fallback_filenames=unique_names[1:],
+                include_automatic_roots=True,
             )
         except RepositoryError as exc:
             accepted_names = ", ".join(unique_names)
             raise RepositoryError(
                 f"Não foi possível localizar a planilha de {label}. Nomes procurados: {accepted_names}. {exc} "
-                f"Mantenha-a sincronizada no OneDrive ou configure {prefix}_EXCEL_PATH no .env."
+                "No outro computador, confirme no Explorador de Arquivos que a biblioteca do SharePoint "
+                "está sincronizada pelo OneDrive e que o arquivo está disponível localmente. "
+                f"Como alternativa, configure {prefix}_EXCEL_PATH no .env."
             ) from exc
 
     @staticmethod
@@ -928,9 +955,21 @@ class LocalExcelRepository:
         prefix, default_sheet, label = definitions[kind]
         configured = os.getenv(f"{prefix}_EXCEL_SHEET_NAME", "").strip()
         requested = configured or default_sheet
-        if requested in workbook.sheetnames:
-            return workbook[requested]
-        if not configured and len(workbook.sheetnames) == 1:
+        normalized_requested = normalize_header(requested)
+        matching_sheet = next(
+            (name for name in workbook.sheetnames if normalize_header(name) == normalized_requested),
+            None,
+        )
+        if matching_sheet:
+            return workbook[matching_sheet]
+        if len(workbook.sheetnames) == 1:
+            if configured:
+                log.warning(
+                    "A aba '%s' não existe em %s; usando a única aba disponível: %s",
+                    requested,
+                    label,
+                    workbook.sheetnames[0],
+                )
             return workbook[workbook.sheetnames[0]]
         raise RepositoryError(
             f"Aba '{requested}' não encontrada na planilha de {label}. "

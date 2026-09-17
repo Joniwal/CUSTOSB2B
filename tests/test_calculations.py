@@ -536,6 +536,58 @@ class CalculationTests(unittest.TestCase):
                 )
             self.assertEqual(located, expected.resolve())
 
+    def test_reference_search_ignores_stale_path_and_checks_all_synced_roots(self):
+        import openpyxl
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            restricted_root = temp_root / "Base principal"
+            synced_root = temp_root / "OneDrive - Empresa"
+            restricted_root.mkdir()
+            (synced_root / "Equipe" / "Referencias").mkdir(parents=True)
+            main_path = restricted_root / "B2B_CTACUSTOS.xlsx"
+            create_test_activity_workbook(main_path)
+            reference_name = "SERVICOS_TESTE_PORTABILIDADE.xlsx"
+            services_path = synced_root / "Equipe" / "Referencias" / reference_name
+            workbook = openpyxl.Workbook()
+            workbook.active.title = "SERVIÇOS"
+            workbook.save(services_path)
+            workbook.close()
+
+            with patch.dict(
+                os.environ,
+                {
+                    "EXCEL_SEARCH_ROOTS": str(restricted_root),
+                    "OneDriveCommercial": str(synced_root),
+                    "EXCEL_FILENAME": main_path.name,
+                    "EXCEL_SHEET_NAME": "Atividades",
+                    "EXCEL_FALLBACK_SAMPLE": "false",
+                    "SERVICES_EXCEL_PATH": str(temp_root / "caminho-antigo" / reference_name),
+                    "SERVICES_EXCEL_FILENAME": reference_name,
+                    "SERVICES_EXCEL_FILENAME_ALIASES": "",
+                },
+                clear=False,
+            ):
+                repository = LocalExcelRepository(temp_root)
+                located = repository._locate_reference_workbook("services")
+
+            self.assertEqual(located, services_path.resolve())
+
+    def test_reference_sheet_name_is_accent_insensitive_and_accepts_only_sheet(self):
+        import openpyxl
+
+        workbook = openpyxl.Workbook()
+        workbook.active.title = "Serviços"
+        with patch.dict(os.environ, {"SERVICES_EXCEL_SHEET_NAME": "SERVICOS"}, clear=False):
+            self.assertEqual(LocalExcelRepository._reference_sheet(workbook, "services").title, "Serviços")
+        workbook.active.title = "Tabela compartilhada"
+        with patch.dict(os.environ, {"SERVICES_EXCEL_SHEET_NAME": "SERVICOS"}, clear=False):
+            self.assertEqual(
+                LocalExcelRepository._reference_sheet(workbook, "services").title,
+                "Tabela compartilhada",
+            )
+        workbook.close()
+
     def test_excel_dates_are_normalized_for_date_inputs(self):
         for value in (datetime(2026, 9, 1), "01/09/2026", "2026-09-01T00:00"):
             with self.subTest(value=value):
