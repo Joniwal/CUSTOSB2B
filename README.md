@@ -133,8 +133,18 @@ O vínculo interno combina a linha com o ID da atividade. Portanto, mesmo que o 
 Execute:
 
 ```powershell
-.\build_exe.ps1
+python build_exe.py
 ```
+
+O script cria automaticamente a pasta `.venv`, instala as dependências e gera
+o aplicativo sem abrir uma janela de console. Em builds seguintes, quando as
+dependências já estiverem instaladas, pode ser usado:
+
+```powershell
+python build_exe.py --skip-install
+```
+
+O comando anterior `./build_exe.ps1` continua disponível.
 
 O resultado fica em `dist/B2B_CTACUSTOS/`. O ícone `web/static/favicon.ico` é aplicado ao executável e o mesmo símbolo aparece como favicon no site. A base compartilhada é localizada nas pastas sincronizadas do usuário, conforme o `.env`; nenhum Excel real deve ser publicado no GitHub.
 
