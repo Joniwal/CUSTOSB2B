@@ -576,6 +576,85 @@ class CalculationTests(unittest.TestCase):
 
             self.assertEqual(located, services_path.resolve())
 
+    def test_reference_search_uses_uploaded_filename_from_another_computer(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            main_path = temp_root / "B2B_CTACUSTOS.xlsx"
+            create_test_activity_workbook(main_path)
+            imports = temp_root / "B2B_CTACUSTOS_Importacoes"
+            imports.mkdir()
+            expected = imports / "SERVICOS-20260918-101500.xlsx"
+            expected.write_bytes(b"xlsx-placeholder")
+
+            with patch.dict(
+                os.environ,
+                {
+                    "EXCEL_PATH": str(main_path),
+                    "SERVICES_EXCEL_PATH": "Z:\\outro-computador\\SERVICOS-20260918-101500.xlsx",
+                    "SERVICES_EXCEL_FILENAME": "SERVICOS.xlsx",
+                },
+                clear=False,
+            ):
+                repository = LocalExcelRepository(temp_root)
+                with patch.object(
+                    repository,
+                    "get_settings",
+                    return_value={
+                        "uploads": {
+                            "services": {
+                                "filename": expected.name,
+                                "path": "Z:\\outro-computador\\SERVICOS-20260918-101500.xlsx",
+                            }
+                        }
+                    },
+                ):
+                    located = repository._locate_reference_workbook("services")
+
+            self.assertEqual(located, expected.resolve())
+
+    def test_missing_services_does_not_block_material_catalog(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            main_path = temp_root / "B2B_CTACUSTOS.xlsx"
+            create_test_activity_workbook(main_path)
+
+            with patch.dict(
+                os.environ,
+                {"EXCEL_PATH": str(main_path), "EXCEL_SHEET_NAME": "Atividades"},
+                clear=False,
+            ):
+                repository = LocalExcelRepository(temp_root)
+                activity = repository.list_activities()[0]
+                with patch.object(repository, "list_services", side_effect=RepositoryError("Serviços indisponíveis")):
+                    with patch.object(
+                        repository,
+                        "list_materials",
+                        return_value={
+                            "items": [{"key": "mat-1", "code": "1", "description": "Cabo", "unit": "M", "unit_price": 2}],
+                            "source": "MATERIAL.xlsx · aba MATERIAIS",
+                        },
+                    ):
+                        calculation = repository.get_service_calculation(activity["record_key"])
+
+            self.assertEqual(calculation["services"], [])
+            self.assertEqual(calculation["services_error"], "Serviços indisponíveis")
+            self.assertEqual(len(calculation["materials"]), 1)
+
+    def test_record_key_works_when_excel_has_no_stored_sheet_dimension(self):
+        class Cell:
+            value = "ATV-001"
+
+        class DimensionlessSheet:
+            max_row = None
+
+            @staticmethod
+            def cell(_row, _column):
+                return Cell()
+
+        repository = object.__new__(LocalExcelRepository)
+        row = repository._find_activity_row(DimensionlessSheet(), {"id": 1}, "2:ATV-001")
+        self.assertEqual(row, 2)
+
     def test_reference_sheet_name_is_accent_insensitive_and_accepts_only_sheet(self):
         import openpyxl
 

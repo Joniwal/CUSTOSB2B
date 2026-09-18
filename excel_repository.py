@@ -891,6 +891,7 @@ class LocalExcelRepository:
                 path,
             )
 
+        metadata: dict[str, Any] = {}
         try:
             metadata = self.get_settings().get("uploads", {}).get(kind, {})
             uploaded_path = Path(clean_text(metadata.get("path"), 500)).expanduser()
@@ -900,15 +901,20 @@ class LocalExcelRepository:
             pass
 
         filename = os.getenv(f"{prefix}_EXCEL_FILENAME", default_name).strip() or default_name
+        uploaded_filename = clean_text(metadata.get("filename"), 240)
         configured_aliases = [
             item.strip()
             for item in os.getenv(f"{prefix}_EXCEL_FILENAME_ALIASES", "").split(";")
             if item.strip()
         ]
-        candidate_names = [filename, *configured_aliases, *default_aliases]
+        # O caminho da aba Config pertence ao computador que fez o upload.
+        # O nome é portátil e acompanha a mesma pasta sincronizada da base.
+        candidate_names = [uploaded_filename, filename, *configured_aliases, *default_aliases]
         unique_names: list[str] = []
         seen_names: set[str] = set()
         for candidate_name in candidate_names:
+            if not candidate_name:
+                continue
             normalized_name = candidate_name.casefold()
             if normalized_name not in seen_names:
                 seen_names.add(normalized_name)
@@ -1530,7 +1536,11 @@ class LocalExcelRepository:
         if row_match:
             row_number = int(row_match.group(1))
             expected_id = clean_text(row_match.group(2), 60)
-            if 2 <= row_number <= sheet.max_row:
+            # Em arquivos gerados por alguns sistemas, a dimensão da aba não
+            # vem gravada e o openpyxl retorna max_row=None no modo somente
+            # leitura. A chave já contém a linha exata, então valide a célula
+            # diretamente sem depender desse metadado opcional.
+            if row_number >= 2:
                 actual_id = clean_text(sheet.cell(row_number, field_columns["id"]).value, 60)
                 if actual_id == expected_id:
                     return row_number
@@ -1538,11 +1548,19 @@ class LocalExcelRepository:
                 "A linha da atividade mudou no Excel. Atualize a lista e abra a calculadora novamente."
             )
 
-        matching_rows = [
-            row_number
-            for row_number in range(2, sheet.max_row + 1)
-            if clean_text(sheet.cell(row_number, field_columns["id"]).value, 60) == reference
-        ]
+        if sheet.max_row is None:
+            id_index = field_columns["id"] - 1
+            matching_rows = [
+                row_number
+                for row_number, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2)
+                if clean_text(row[id_index] if len(row) > id_index else "", 60) == reference
+            ]
+        else:
+            matching_rows = [
+                row_number
+                for row_number in range(2, sheet.max_row + 1)
+                if clean_text(sheet.cell(row_number, field_columns["id"]).value, 60) == reference
+            ]
         if not matching_rows:
             raise RepositoryError(f"Atividade '{reference}' não encontrada.")
         if len(matching_rows) > 1:
@@ -2004,7 +2022,12 @@ class LocalExcelRepository:
         return round(daily_rate * technicians * days, 2)
 
     def get_service_calculation(self, activity_reference: str) -> dict[str, Any]:
-        catalog = self.list_services()
+        services_error = ""
+        try:
+            catalog = self.list_services()
+        except RepositoryError as exc:
+            catalog = {"items": [], "source": "SERVICOS.xlsx"}
+            services_error = str(exc)
         catalog_by_key = {item["key"]: item for item in catalog["items"]}
         materials_error = ""
         try:
@@ -2129,6 +2152,7 @@ class LocalExcelRepository:
                     "labor_total": service_total if selected else standard_labor_cost,
                     "gap": round((service_total if selected else standard_labor_cost) - standard_labor_cost, 2),
                     "source": catalog["source"],
+                    "services_error": services_error,
                 }
             finally:
                 workbook.close()

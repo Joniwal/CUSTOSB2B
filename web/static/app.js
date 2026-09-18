@@ -840,6 +840,7 @@
     materialsChanged: false,
     materialsError: "",
     services: [],
+    servicesError: "",
     selected: [],
     source: "",
     query: "",
@@ -1019,7 +1020,8 @@
     });
     document.querySelector("#service-catalog-count").textContent = `${filtered.length} de ${serviceCalculatorState.services.length} serviços`;
     if (!filtered.length) {
-      list.innerHTML = `<div class="service-loading">${iconEmpty}<p>Nenhum serviço encontrado.</p></div>`;
+      const message = serviceCalculatorState.servicesError || "Nenhum serviço encontrado na planilha.";
+      list.innerHTML = `<div class="service-loading${serviceCalculatorState.servicesError ? " service-loading--error" : ""}">${iconEmpty}<p>${escapeHtml(message)}</p></div>`;
       return;
     }
     const selectedKeys = new Set(serviceCalculatorState.selected.map((item) => item.key));
@@ -1077,6 +1079,7 @@
     serviceCalculatorState.materialsChanged = false;
     serviceCalculatorState.materialsError = "";
     serviceCalculatorState.services = [];
+    serviceCalculatorState.servicesError = "";
     serviceCalculatorState.selected = [];
     serviceCalculatorState.query = "";
     serviceCalculatorState.standardLaborCost = 0;
@@ -1116,6 +1119,7 @@
       serviceCalculatorState.materialsError = data.materials_error || "";
       serviceCalculatorState.materialsChanged = false;
       serviceCalculatorState.services = data.services || [];
+      serviceCalculatorState.servicesError = data.services_error || "";
       serviceCalculatorState.selected = (data.selected || []).map((item) => ({
         ...item,
         quantity: Math.max(1, Math.trunc(Number(item.quantity || 1))),
@@ -1138,6 +1142,7 @@
       setCalculatorTab("materials");
     } catch (error) {
       document.querySelector("#service-catalog-list").innerHTML = `<div class="service-loading service-loading--error">${iconEmpty}<p>${escapeHtml(error.message)}</p></div>`;
+      document.querySelector("#material-catalog-list").innerHTML = `<div class="service-loading service-loading--error">${iconEmpty}<p>${escapeHtml(error.message)}</p></div>`;
       document.querySelector("#service-calculator-status").textContent = error.message;
       toast("Não foi possível abrir a calculadora", error.message, true);
     }
