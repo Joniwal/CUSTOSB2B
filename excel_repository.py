@@ -875,8 +875,10 @@ class LocalExcelRepository:
         prefix, default_name, default_aliases, label = definitions[kind]
 
         explicit = os.getenv(f"{prefix}_EXCEL_PATH", "").strip()
+        explicit_filename = ""
         if explicit:
             path = Path(explicit).expanduser()
+            explicit_filename = path.name
             if not path.is_absolute():
                 path = self.file_path.parent / path
             path = path.resolve()
@@ -909,7 +911,13 @@ class LocalExcelRepository:
         ]
         # O caminho da aba Config pertence ao computador que fez o upload.
         # O nome é portátil e acompanha a mesma pasta sincronizada da base.
-        candidate_names = [uploaded_filename, filename, *configured_aliases, *default_aliases]
+        candidate_names = [
+            uploaded_filename,
+            explicit_filename,
+            filename,
+            *configured_aliases,
+            *default_aliases,
+        ]
         unique_names: list[str] = []
         seen_names: set[str] = set()
         for candidate_name in candidate_names:
@@ -920,8 +928,23 @@ class LocalExcelRepository:
                 seen_names.add(normalized_name)
                 unique_names.append(candidate_name)
 
-        for directory in (self.file_path.parent, self._reference_upload_dir()):
-            for candidate_name in unique_names:
+        nearby_directories: list[Path] = []
+        nearby_seen: set[str] = set()
+        for directory in (
+            self.file_path.parent,
+            self._reference_upload_dir(),
+            self.file_path.parent / "B2B_CTACUSTOS_Importacoes",
+        ):
+            normalized_directory = os.path.normcase(str(directory.resolve()))
+            if normalized_directory not in nearby_seen:
+                nearby_seen.add(normalized_directory)
+                nearby_directories.append(directory)
+
+        # Priorize o nome gravado na aba Config, mesmo quando o caminho foi
+        # salvo em outro computador. Isso evita escolher uma cópia antiga com
+        # o nome padrão antes da versão realmente enviada pelo usuário.
+        for candidate_name in unique_names:
+            for directory in nearby_directories:
                 try:
                     match = next(
                         (
@@ -935,6 +958,42 @@ class LocalExcelRepository:
                     match = None
                 if match:
                     return match.resolve()
+
+        # Se a aba Config foi perdida ou não foi sincronizada, ainda reconheça
+        # as versões criadas pela área de upload, como SERVICOS-20260918.xlsx.
+        # A pasta de importações é pequena e local à base principal, portanto
+        # esta verificação acontece antes de percorrer todo o OneDrive.
+        reference_prefixes = {
+            "services": ("servico", "servicos"),
+            "materials": ("material", "materiais"),
+        }[kind]
+        versioned_matches: list[Path] = []
+        for directory in nearby_directories[1:]:
+            try:
+                children = list(directory.iterdir())
+            except (FileNotFoundError, OSError, PermissionError):
+                continue
+            for child in children:
+                if (
+                    not child.is_file()
+                    or child.name.startswith("~$")
+                    or child.suffix.casefold() not in {".xlsx", ".xlsm"}
+                ):
+                    continue
+                normalized_stem = normalize_header(child.stem)
+                if any(normalized_stem.startswith(prefix) for prefix in reference_prefixes):
+                    versioned_matches.append(child)
+
+        if versioned_matches:
+            def modified_at(path: Path) -> float:
+                try:
+                    return path.stat().st_mtime
+                except OSError:
+                    return 0.0
+
+            selected = max(versioned_matches, key=lambda path: (modified_at(path), path.name.casefold()))
+            log.info("Planilha de %s localizada na pasta de importações: %s", label, selected)
+            return selected.resolve()
 
         try:
             return discover_excel_file(

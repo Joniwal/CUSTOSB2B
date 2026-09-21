@@ -94,14 +94,30 @@
   }
 
   async function getJson(url, options = {}) {
-    const response = await fetch(url, { headers: { Accept: "application/json", ...(options.headers || {}) }, ...options });
-    const payload = await response.json().catch(() => ({ error: "Resposta inválida do servidor." }));
-    if (!response.ok || payload.ok === false) {
-      const error = new Error(payload.error || `Erro HTTP ${response.status}`);
-      error.status = response.status;
+    const { timeoutMs = 0, ...fetchOptions } = options;
+    const controller = timeoutMs > 0 ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+    try {
+      const response = await fetch(url, {
+        headers: { Accept: "application/json", ...(fetchOptions.headers || {}) },
+        ...fetchOptions,
+        ...(controller ? { signal: controller.signal } : {}),
+      });
+      const payload = await response.json().catch(() => ({ error: "Resposta inválida do servidor." }));
+      if (!response.ok || payload.ok === false) {
+        const error = new Error(payload.error || `Erro HTTP ${response.status}`);
+        error.status = response.status;
+        throw error;
+      }
+      return payload;
+    } catch (error) {
+      if (error.name === "AbortError") {
+        throw new Error("A leitura das planilhas demorou demais. Confirme se os arquivos estão disponíveis offline no OneDrive e tente novamente.");
+      }
       throw error;
+    } finally {
+      if (timer) clearTimeout(timer);
     }
-    return payload;
   }
 
   function setupShell() {
@@ -1108,7 +1124,7 @@
     setCalculatorTab("materials", false);
 
     try {
-      const data = await getJson(`/api/service-calculation?activity=${encodeURIComponent(reference)}`);
+      const data = await getJson(`/api/service-calculation?activity=${encodeURIComponent(reference)}`, { timeoutMs: 45000 });
       serviceCalculatorState.activity = data.activity;
       serviceCalculatorState.materials = data.materials || [];
       serviceCalculatorState.selectedMaterials = (data.selected_materials || []).map((item) => ({

@@ -612,6 +612,61 @@ class CalculationTests(unittest.TestCase):
 
             self.assertEqual(located, expected.resolve())
 
+    def test_reference_search_recovers_latest_versioned_files_from_import_folder(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            main_path = temp_root / "B2B_CTACUSTOS.xlsx"
+            create_test_activity_workbook(main_path)
+            imports = temp_root / "B2B_CTACUSTOS_Importacoes"
+            imports.mkdir()
+            older = imports / "SERVICOS-20260917-090000.xlsx"
+            newer = imports / "SERVICOS-20260918-131800.xlsx"
+            older.write_bytes(b"old")
+            newer.write_bytes(b"new")
+            os.utime(older, (1, 1))
+            os.utime(newer, (2, 2))
+
+            with patch.dict(
+                os.environ,
+                {
+                    "EXCEL_PATH": str(main_path),
+                    "SERVICES_EXCEL_PATH": "Z:\\computador-antigo\\SERVICOS-20260916.xlsx",
+                    "SERVICES_EXCEL_FILENAME": "SERVICOS.xlsx",
+                },
+                clear=False,
+            ):
+                repository = LocalExcelRepository(temp_root)
+                with patch.object(repository, "get_settings", return_value={"uploads": {}}):
+                    located = repository._locate_reference_workbook("services")
+
+            self.assertEqual(located, newer.resolve())
+
+    def test_reference_search_checks_default_import_folder_when_configured_folder_is_stale(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            main_path = temp_root / "B2B_CTACUSTOS.xlsx"
+            create_test_activity_workbook(main_path)
+            imports = temp_root / "B2B_CTACUSTOS_Importacoes"
+            imports.mkdir()
+            expected = imports / "MATERIAIS-20260918.xlsx"
+            expected.write_bytes(b"materials")
+
+            with patch.dict(
+                os.environ,
+                {
+                    "EXCEL_PATH": str(main_path),
+                    "REFERENCE_UPLOAD_DIR": "Z:\\pasta-antiga\\Importacoes",
+                    "MATERIALS_EXCEL_PATH": "",
+                    "MATERIALS_EXCEL_FILENAME": "MATERIAL.xlsx",
+                },
+                clear=False,
+            ):
+                repository = LocalExcelRepository(temp_root)
+                with patch.object(repository, "get_settings", return_value={"uploads": {}}):
+                    located = repository._locate_reference_workbook("materials")
+
+            self.assertEqual(located, expected.resolve())
+
     def test_missing_services_does_not_block_material_catalog(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
