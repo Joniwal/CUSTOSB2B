@@ -97,9 +97,71 @@ class CalculationTests(unittest.TestCase):
         self.assertIn('name="draft"', html)
         self.assertIn('id="export-button"', html)
         self.assertIn('id="form-technology"', html)
+        self.assertIn('name="allow_duplicate_id"', html)
+        self.assertIn('value="true"', html)
+        self.assertIn('value="false" checked', html)
         self.assertIn('Custo Serviço', html)
         self.assertNotIn('name="ganho_esperado"', html)
         self.assertNotIn('valor técnico/dia × técnicos × dias neste formulário', html)
+
+    def test_duplicate_id_on_create_requires_explicit_permission(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            workbook_path = temp_root / "B2B_CTACUSTOS.xlsx"
+            create_test_activity_workbook(workbook_path)
+            payload = {
+                "id": "ATV-001",
+                "data": "2026-09-21",
+                "tipo_atividade": "REPARO",
+                "status": "NOVO",
+                "situacao": "TESTE DE ID REPETIDO",
+            }
+
+            with patch.dict(
+                os.environ,
+                {
+                    "EXCEL_PATH": str(workbook_path),
+                    "EXCEL_SHEET_NAME": "Atividades",
+                    "EXCEL_FALLBACK_SAMPLE": "false",
+                },
+                clear=False,
+            ):
+                repository = LocalExcelRepository(temp_root)
+                with self.assertRaisesRegex(RepositoryError, "Permitir ID já existente"):
+                    repository.create_activity(payload)
+                created = repository.create_activity({**payload, "allow_duplicate_id": "true"})
+                activities = repository.list_activities()
+
+            self.assertEqual(created["id"], "ATV-001")
+            self.assertEqual(sum(item["id"] == "ATV-001" for item in activities), 2)
+
+    def test_duplicate_id_on_edit_requires_explicit_permission(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            workbook_path = temp_root / "B2B_CTACUSTOS.xlsx"
+            create_test_activity_workbook(workbook_path)
+
+            with patch.dict(
+                os.environ,
+                {
+                    "EXCEL_PATH": str(workbook_path),
+                    "EXCEL_SHEET_NAME": "Atividades",
+                    "EXCEL_FALLBACK_SAMPLE": "false",
+                },
+                clear=False,
+            ):
+                repository = LocalExcelRepository(temp_root)
+                first, second = repository.list_activities()[:2]
+                with self.assertRaisesRegex(RepositoryError, "Permitir ID já existente"):
+                    repository.update_activity(second["record_key"], {"id": first["id"]})
+                updated = repository.update_activity(
+                    second["record_key"],
+                    {"id": first["id"], "allow_duplicate_id": "true"},
+                )
+                activities = repository.list_activities()
+
+            self.assertEqual(updated["id"], first["id"])
+            self.assertEqual(sum(item["id"] == first["id"] for item in activities), 2)
 
     def test_category_summary_uses_configured_monthly_team_values(self):
         rows = [

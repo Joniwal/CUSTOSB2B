@@ -685,7 +685,6 @@
     const form = document.querySelector("#edit-form");
     form.reset();
     editingActivity = { _new: true, calculation_mode: listState.calculationMode };
-    document.querySelector("#create-id-field").hidden = false;
     form.elements.data.value = localIsoDate();
     document.querySelector("#modal-eyebrow").textContent = "Inclusão na planilha";
     document.querySelector("#modal-title").childNodes[0].textContent = "Incluir atividade ";
@@ -704,13 +703,12 @@
     editingActivity = activity;
     const form = document.querySelector("#edit-form");
     form.reset();
-    document.querySelector("#create-id-field").hidden = true;
     document.querySelector("#modal-eyebrow").textContent = "Edição da planilha";
     document.querySelector("#modal-title").childNodes[0].textContent = "Editar atividade ";
     document.querySelector("#modal-activity-id").textContent = `#${activity.id}`;
     document.querySelector("#save-button").textContent = "Salvar alterações";
     activityFields.forEach((field) => {
-      if (!form.elements[field] || field === "id") return;
+      if (!form.elements[field]) return;
       if (form.elements[field].tagName === "SELECT") ensureSelectValue(form.elements[field], activity[field]);
       else form.elements[field].value = activity[field] ?? "";
     });

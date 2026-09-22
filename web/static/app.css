@@ -502,6 +502,11 @@ th[aria-sort="descending"] .sort-button span::after { content: "↓"; font-size:
 .input-group--manual > span { color: var(--color-primary-strong); }
 .input-group--manual .money-input input { border-color: var(--color-primary-strong); background: white; box-shadow: 0 0 0 3px rgb(122 47 115 / 9%); }
 .input-group--manual small { color: var(--color-primary-strong); font-weight: 700; }
+.duplicate-id-control { display: flex; grid-column: 1 / -1; flex-wrap: wrap; align-items: center; gap: 8px 18px; min-width: 0; margin: 0; padding: 9px 12px; border: 1px solid var(--color-border); border-radius: 9px; background: var(--color-surface-alt); }
+.duplicate-id-control legend { padding: 0 5px; color: var(--color-text-soft); font-size: 10px; font-weight: 800; }
+.duplicate-id-control label { display: inline-flex; align-items: center; gap: 7px; color: var(--color-text); font-size: 10px; font-weight: 700; cursor: pointer; }
+.duplicate-id-control input { width: 15px; height: 15px; margin: 0; accent-color: var(--color-primary-strong); cursor: pointer; }
+.duplicate-id-control small { width: 100%; color: var(--color-text-muted); font-size: 9px; }
 .form-section--results { margin: 18px -10px 10px; padding: 18px 14px; border: 1px solid #EAC9E6 !important; border-radius: 12px; background: #FFFAFE; }
 .calculated-output { display: flex; align-items: center; height: 39px; padding: 0 11px; border: 1px solid #E8D8E6; border-radius: 9px; background: white; color: var(--color-text); font-size: 12px; font-weight: 800; }
 .calculated-output--gap.is-positive { border-color: #A7DCC1; background: var(--color-success-soft); color: var(--color-success); }

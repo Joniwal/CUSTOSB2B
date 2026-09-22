@@ -8,7 +8,7 @@
   <title>Atividades · B2B CTACUSTOS</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="alternate icon" href="/favicon.ico">
-  <link rel="stylesheet" href="/static/app.css?v=20260916-1">
+  <link rel="stylesheet" href="/static/app.css?v=20260921-1">
 </head>
 <body data-page="activities">
   <a class="skip-link" href="#conteudo">Ir para o conteúdo principal</a>
@@ -176,11 +176,17 @@
         <div class="form-section form-section--identity">
           <div class="form-section__heading"><span>1</span><div><h3>Identificação</h3><p>Dados de controle e acompanhamento.</p></div></div>
           <div class="form-grid form-grid--four">
-            <label class="input-group" id="create-id-field" hidden><span>ID <small>(opcional)</small></span><input name="id" maxlength="60" placeholder="Gerado automaticamente"></label>
+            <label class="input-group" id="activity-id-field"><span>ID <small>(opcional na inclusão)</small></span><input name="id" maxlength="60" placeholder="Gerado automaticamente"></label>
             <label class="input-group"><span>Data</span><input name="data" type="date" required></label>
             <label class="input-group"><span>Tipo de atividade</span><input name="tipo_atividade" list="type-options" required maxlength="120"><datalist id="type-options"></datalist></label>
             <label class="input-group"><span>Status</span><select name="status" id="form-status" required><option value="">Selecione</option></select></label>
             <label class="input-group input-group--wide"><span>Situação / detalhes</span><input name="situacao" required maxlength="180"></label>
+            <fieldset class="duplicate-id-control">
+              <legend>Validação do ID</legend>
+              <label><input type="radio" name="allow_duplicate_id" value="false" checked> Exigir ID único</label>
+              <label><input type="radio" name="allow_duplicate_id" value="true"> Permitir ID já existente</label>
+              <small>IDs repetidos somente serão aceitos quando a segunda opção estiver marcada.</small>
+            </fieldset>
           </div>
         </div>
 
@@ -355,6 +361,6 @@
   </dialog>
 
   <div class="toast-region" id="toast-region" role="status" aria-live="polite"></div>
-  <script src="/static/app.js?v=20260918-2" defer></script>
+  <script src="/static/app.js?v=20260921-1" defer></script>
 </body>
 </html>

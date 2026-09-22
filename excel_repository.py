@@ -1814,8 +1814,23 @@ class LocalExcelRepository:
                 merged_payload.update(payload)
                 merged_payload["custo_tecnico_dia"] = self._daily_rate_from_open_workbook(workbook)
                 actual_id = clean_text(sheet.cell(target_row, field_columns["id"]).value, 60)
+                requested_id = clean_text(merged_payload.get("id"), 60) or actual_id
+                allow_duplicate_id = str(payload.get("allow_duplicate_id", "")).strip().casefold() in {
+                    "1", "true", "yes", "sim", "on",
+                }
+                if requested_id != actual_id and not allow_duplicate_id:
+                    duplicate_exists = any(
+                        row_number != target_row
+                        and clean_text(sheet.cell(row_number, field_columns["id"]).value, 60) == requested_id
+                        for row_number in range(2, sheet.max_row + 1)
+                    )
+                    if duplicate_exists:
+                        raise RepositoryError(
+                            f"Já existe uma atividade com o ID '{requested_id}'. "
+                            "Marque 'Permitir ID já existente' para confirmar a duplicidade."
+                        )
                 activity = self._prepare_activity(
-                    actual_id,
+                    requested_id,
                     merged_payload,
                     mode,
                     use_team_gap=False,
@@ -1823,7 +1838,7 @@ class LocalExcelRepository:
                 )
 
                 self._apply_activity_to_row(
-                    sheet, headers, field_columns, target_row, activity, mode, include_id=False
+                    sheet, headers, field_columns, target_row, activity, mode, include_id=True
                 )
                 self._save_workbook(workbook)
                 saved = normalize_activity(activity, use_team_gap=False)
@@ -1852,8 +1867,14 @@ class LocalExcelRepository:
                     if clean_text(sheet.cell(row, field_columns["id"]).value)
                 }
                 requested_id = clean_text(payload.get("id"), 60)
-                if requested_id and requested_id in existing_ids:
-                    raise RepositoryError(f"Já existe uma atividade com o ID '{requested_id}'.")
+                allow_duplicate_id = str(payload.get("allow_duplicate_id", "")).strip().casefold() in {
+                    "1", "true", "yes", "sim", "on",
+                }
+                if requested_id and requested_id in existing_ids and not allow_duplicate_id:
+                    raise RepositoryError(
+                        f"Já existe uma atividade com o ID '{requested_id}'. "
+                        "Marque 'Permitir ID já existente' para confirmar a duplicidade."
+                    )
                 numeric_ids = [int(value) for value in existing_ids if value.isdigit()]
                 activity_id = requested_id or str(max(numeric_ids, default=0) + 1)
                 prepared_payload = dict(payload)
