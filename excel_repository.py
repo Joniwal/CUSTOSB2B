@@ -7,8 +7,6 @@ import os
 import re
 import threading
 import unicodedata
-import uuid
-import zipfile
 from calendar import monthrange
 from copy import copy
 from collections import Counter
@@ -865,8 +863,8 @@ class LocalExcelRepository:
             ),
             "materials": (
                 "MATERIALS",
-                "MATERIAL.xlsx",
-                ("MATERIAIS.xlsx", "MATERIAL.xlsm", "MATERIAIS.xlsm"),
+                "MATERIAIS.xlsx",
+                ("MATERIAL.xlsx", "MATERIAIS.xlsm", "MATERIAL.xlsm"),
                 "materiais",
             ),
         }
@@ -875,10 +873,8 @@ class LocalExcelRepository:
         prefix, default_name, default_aliases, label = definitions[kind]
 
         explicit = os.getenv(f"{prefix}_EXCEL_PATH", "").strip()
-        explicit_filename = ""
         if explicit:
             path = Path(explicit).expanduser()
-            explicit_filename = path.name
             if not path.is_absolute():
                 path = self.file_path.parent / path
             path = path.resolve()
@@ -893,31 +889,13 @@ class LocalExcelRepository:
                 path,
             )
 
-        metadata: dict[str, Any] = {}
-        try:
-            metadata = self.get_settings().get("uploads", {}).get(kind, {})
-            uploaded_path = Path(clean_text(metadata.get("path"), 500)).expanduser()
-            if str(uploaded_path) not in {"", "."} and uploaded_path.is_file():
-                return uploaded_path.resolve()
-        except (OSError, RepositoryError):
-            pass
-
         filename = os.getenv(f"{prefix}_EXCEL_FILENAME", default_name).strip() or default_name
-        uploaded_filename = clean_text(metadata.get("filename"), 240)
         configured_aliases = [
             item.strip()
             for item in os.getenv(f"{prefix}_EXCEL_FILENAME_ALIASES", "").split(";")
             if item.strip()
         ]
-        # O caminho da aba Config pertence ao computador que fez o upload.
-        # O nome é portátil e acompanha a mesma pasta sincronizada da base.
-        candidate_names = [
-            uploaded_filename,
-            explicit_filename,
-            filename,
-            *configured_aliases,
-            *default_aliases,
-        ]
+        candidate_names = [filename, *configured_aliases, *default_aliases]
         unique_names: list[str] = []
         seen_names: set[str] = set()
         for candidate_name in candidate_names:
@@ -927,73 +905,6 @@ class LocalExcelRepository:
             if normalized_name not in seen_names:
                 seen_names.add(normalized_name)
                 unique_names.append(candidate_name)
-
-        nearby_directories: list[Path] = []
-        nearby_seen: set[str] = set()
-        for directory in (
-            self.file_path.parent,
-            self._reference_upload_dir(),
-            self.file_path.parent / "B2B_CTACUSTOS_Importacoes",
-        ):
-            normalized_directory = os.path.normcase(str(directory.resolve()))
-            if normalized_directory not in nearby_seen:
-                nearby_seen.add(normalized_directory)
-                nearby_directories.append(directory)
-
-        # Priorize o nome gravado na aba Config, mesmo quando o caminho foi
-        # salvo em outro computador. Isso evita escolher uma cópia antiga com
-        # o nome padrão antes da versão realmente enviada pelo usuário.
-        for candidate_name in unique_names:
-            for directory in nearby_directories:
-                try:
-                    match = next(
-                        (
-                            child
-                            for child in directory.iterdir()
-                            if child.is_file() and child.name.casefold() == candidate_name.casefold()
-                        ),
-                        None,
-                    )
-                except (FileNotFoundError, OSError, PermissionError):
-                    match = None
-                if match:
-                    return match.resolve()
-
-        # Se a aba Config foi perdida ou não foi sincronizada, ainda reconheça
-        # as versões criadas pela área de upload, como SERVICOS-20260918.xlsx.
-        # A pasta de importações é pequena e local à base principal, portanto
-        # esta verificação acontece antes de percorrer todo o OneDrive.
-        reference_prefixes = {
-            "services": ("servico", "servicos"),
-            "materials": ("material", "materiais"),
-        }[kind]
-        versioned_matches: list[Path] = []
-        for directory in nearby_directories[1:]:
-            try:
-                children = list(directory.iterdir())
-            except (FileNotFoundError, OSError, PermissionError):
-                continue
-            for child in children:
-                if (
-                    not child.is_file()
-                    or child.name.startswith("~$")
-                    or child.suffix.casefold() not in {".xlsx", ".xlsm"}
-                ):
-                    continue
-                normalized_stem = normalize_header(child.stem)
-                if any(normalized_stem.startswith(prefix) for prefix in reference_prefixes):
-                    versioned_matches.append(child)
-
-        if versioned_matches:
-            def modified_at(path: Path) -> float:
-                try:
-                    return path.stat().st_mtime
-                except OSError:
-                    return 0.0
-
-            selected = max(versioned_matches, key=lambda path: (modified_at(path), path.name.casefold()))
-            log.info("Planilha de %s localizada na pasta de importações: %s", label, selected)
-            return selected.resolve()
 
         try:
             return discover_excel_file(
@@ -1006,8 +917,8 @@ class LocalExcelRepository:
             accepted_names = ", ".join(unique_names)
             raise RepositoryError(
                 f"Não foi possível localizar a planilha de {label}. Nomes procurados: {accepted_names}. {exc} "
-                "No outro computador, confirme no Explorador de Arquivos que a biblioteca do SharePoint "
-                "está sincronizada pelo OneDrive e que o arquivo está disponível localmente. "
+                "Confirme no Explorador de Arquivos que a biblioteca do SharePoint está sincronizada "
+                "pelo OneDrive e que o arquivo está disponível localmente. "
                 f"Como alternativa, configure {prefix}_EXCEL_PATH no .env."
             ) from exc
 
@@ -1283,16 +1194,6 @@ class LocalExcelRepository:
             ),
         }
 
-    def _reference_upload_dir(self) -> Path:
-        configured = os.getenv("REFERENCE_UPLOAD_DIR", "").strip()
-        if configured:
-            directory = Path(configured).expanduser()
-            if not directory.is_absolute():
-                directory = self.file_path.parent / directory
-        else:
-            directory = self.file_path.parent / "B2B_CTACUSTOS_Importacoes"
-        return directory.resolve()
-
     @staticmethod
     def _config_header_row(sheet) -> int | None:
         for row_number in range(4, min(sheet.max_row, 12) + 1):
@@ -1356,11 +1257,6 @@ class LocalExcelRepository:
             "technicians": [dict(item) for item in activity_options["technicians"]],
             "companies": list(activity_options["companies"]),
             "eps": list(activity_options["eps"]),
-            "upload_directory": str(self._reference_upload_dir()),
-            "uploads": {
-                "services": {"filename": "", "path": "", "uploaded_at": ""},
-                "materials": {"filename": "", "path": "", "uploaded_at": ""},
-            },
             "calculation_status": (
                 "Valor da equipe por categoria = total de técnicos × custo mensal do técnico. "
                 "O custo diário permanece disponível somente para a calculadora detalhada."
@@ -1421,7 +1317,6 @@ class LocalExcelRepository:
                     raw_code = row[1] if len(row) > 1 else ""
                     code = clean_text(raw_code, 120)
                     value = clean_text(row[2] if len(row) > 2 else "", 500)
-                    uploaded_at = clean_text(row[3] if len(row) > 3 else "", 40)
                     if category == "status" and value:
                         configured["statuses"].append(value)
                     elif category in {"tipoatividade", "tiposatividade"}:
@@ -1458,19 +1353,6 @@ class LocalExcelRepository:
                         configured["companies"].append(value)
                     elif category == "eps" and value:
                         configured["eps"].append(value)
-                    elif category == "arquivoservicos" and (code or value):
-                        settings["uploads"]["services"] = {
-                            "filename": code,
-                            "path": value,
-                            "uploaded_at": uploaded_at,
-                        }
-                    elif category == "arquivomateriais" and (code or value):
-                        settings["uploads"]["materials"] = {
-                            "filename": code,
-                            "path": value,
-                            "uploaded_at": uploaded_at,
-                        }
-
                 # Older Config sheets predate these two catalogs. Bootstrap them
                 # from the activity base until the administrator saves the new layout.
                 if "types" not in configured_catalogs:
@@ -2113,7 +1995,7 @@ class LocalExcelRepository:
         try:
             material_catalog = self.list_materials()
         except RepositoryError as exc:
-            material_catalog = {"items": [], "source": "MATERIAL.xlsx"}
+            material_catalog = {"items": [], "source": "MATERIAIS.xlsx"}
             materials_error = str(exc)
         materials_by_key = {item["key"]: item for item in material_catalog["items"]}
         settings = self.get_settings()
@@ -2286,7 +2168,7 @@ class LocalExcelRepository:
         service_total = round(sum(item["subtotal"] for item in selected), 2)
 
         selected_materials: list[dict[str, Any]] = []
-        material_catalog = {"items": [], "source": "MATERIAL.xlsx"}
+        material_catalog = {"items": [], "source": "MATERIAIS.xlsx"}
         if materials_changed:
             material_catalog = self.list_materials()
             materials_by_key = {item["key"]: item for item in material_catalog["items"]}
@@ -2297,7 +2179,7 @@ class LocalExcelRepository:
                 material_key = clean_text(raw_item.get("key"), 120)
                 if material_key not in materials_by_key:
                     raise ValueError(
-                        "Um material selecionado não existe mais na planilha MATERIAL.xlsx. Atualize a calculadora."
+                        "Um material selecionado não existe mais na planilha MATERIAIS.xlsx. Atualize a calculadora."
                     )
                 quantity = round(to_number(raw_item.get("quantity")), 4)
                 if quantity <= 0 or quantity > 1_000_000_000:
@@ -2563,20 +2445,6 @@ class LocalExcelRepository:
             technician_map.setdefault(key, {"registration": registration, "name": name})
         technicians = list(technician_map.values())
 
-        raw_uploads = payload.get("uploads")
-        if not isinstance(raw_uploads, dict):
-            raw_uploads = self.get_settings().get("uploads", {})
-        uploads: dict[str, dict[str, str]] = {}
-        for kind in ("services", "materials"):
-            item = raw_uploads.get(kind, {}) if isinstance(raw_uploads, dict) else {}
-            if not isinstance(item, dict):
-                item = {}
-            uploads[kind] = {
-                "filename": clean_text(item.get("filename"), 240),
-                "path": clean_text(item.get("path"), 500),
-                "uploaded_at": clean_text(item.get("uploaded_at"), 40),
-            }
-
         with self._lock:
             openpyxl = self._openpyxl()
             try:
@@ -2589,8 +2457,8 @@ class LocalExcelRepository:
                 sheet.append(["Dias úteis do mês", business_days])
                 sheet.append(["Custo técnico/dia", global_rate])
                 sheet.append(["Mês de referência", reference_month])
-                sheet.append(["Pasta de importações", str(self._reference_upload_dir())])
-                sheet.append(["Uso", "Indicadores, cadastros e planilhas de referência do B2B CTACUSTOS."])
+                sheet.append(["Bases da calculadora", "SERVICOS.xlsx e MATERIAIS.xlsx localizadas automaticamente pelo nome."])
+                sheet.append(["Uso", "Indicadores e cadastros do B2B CTACUSTOS."])
                 sheet.append(["Categoria", "Código/Matrícula", "Nome/Valor", "Atualizado em"])
                 for status in statuses:
                     sheet.append(["STATUS", "", status])
@@ -2610,11 +2478,6 @@ class LocalExcelRepository:
                     sheet.append(["EMPRESA", "", company])
                 for eps in eps_values:
                     sheet.append(["EPS", "", eps])
-                for kind, category in (("services", "ARQUIVO_SERVICOS"), ("materials", "ARQUIVO_MATERIAIS")):
-                    item = uploads[kind]
-                    if item["filename"] or item["path"]:
-                        sheet.append([category, item["filename"], item["path"], item["uploaded_at"]])
-
                 from openpyxl.styles import Font, PatternFill
 
                 header_fill = PatternFill("solid", fgColor="DD7FD4")
@@ -2642,60 +2505,6 @@ class LocalExcelRepository:
                 raise RepositoryError("O Excel está bloqueado para salvar configurações. Feche o arquivo e tente novamente.") from exc
             except OSError as exc:
                 raise RepositoryError(f"Não foi possível salvar as configurações: {exc}") from exc
-
-    def save_reference_workbook(self, kind: str, filename: str, content: bytes) -> dict[str, str]:
-        labels = {"services": "Serviços", "materials": "Materiais"}
-        if kind not in labels:
-            raise ValueError("Tipo de planilha inválido.")
-        original_name = Path(str(filename or "").replace("\\", "/")).name
-        safe_name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", original_name).strip(" .")
-        suffix = Path(safe_name).suffix.casefold()
-        if not safe_name or suffix not in {".xlsx", ".xlsm"}:
-            raise ValueError("Selecione uma planilha .xlsx ou .xlsm.")
-        if not content or len(content) > 25 * 1024 * 1024:
-            raise ValueError("A planilha deve ter no máximo 25 MB.")
-        if not zipfile.is_zipfile(io.BytesIO(content)):
-            raise ValueError("O arquivo enviado não é uma planilha Excel válida.")
-
-        directory = self._reference_upload_dir()
-        with self._lock:
-            try:
-                directory.mkdir(parents=True, exist_ok=True)
-                destination = directory / safe_name
-                if destination.exists():
-                    stamp = datetime.now().strftime("%Y%m%d-%H%M%S-%f")
-                    destination = directory / f"{destination.stem}-{stamp}{destination.suffix}"
-                temporary = directory / f".{destination.name}.{uuid.uuid4().hex}.uploading"
-                try:
-                    temporary.write_bytes(content)
-                    os.replace(temporary, destination)
-                finally:
-                    if temporary.exists():
-                        temporary.unlink()
-
-                metadata = {
-                    "filename": destination.name,
-                    "path": str(destination),
-                    "uploaded_at": datetime.now().isoformat(timespec="seconds"),
-                }
-                settings = self.get_settings()
-                settings["uploads"][kind] = metadata
-                try:
-                    self.save_settings(settings)
-                except Exception:
-                    try:
-                        destination.unlink()
-                    except OSError:
-                        pass
-                    raise
-                return {**metadata, "directory": str(directory), "label": labels[kind]}
-            except PermissionError as exc:
-                raise RepositoryError(
-                    "Não foi possível gravar na pasta sincronizada. Verifique a permissão do OneDrive."
-                ) from exc
-            except OSError as exc:
-                raise RepositoryError(f"Não foi possível salvar a planilha de {labels[kind].lower()}: {exc}") from exc
-
 
 def build_repository(base_dir: Path):
     return LocalExcelRepository(base_dir)

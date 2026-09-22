@@ -638,96 +638,41 @@ class CalculationTests(unittest.TestCase):
 
             self.assertEqual(located, services_path.resolve())
 
-    def test_reference_search_uses_uploaded_filename_from_another_computer(self):
+    def test_all_workbooks_are_discovered_by_name_in_the_same_synced_root(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)
-            main_path = temp_root / "B2B_CTACUSTOS.xlsx"
+            synced_root = temp_root / "OneDrive - Empresa" / "Projeto"
+            synced_root.mkdir(parents=True)
+            main_path = synced_root / "B2B_CTACUSTOS.xlsx"
             create_test_activity_workbook(main_path)
-            imports = temp_root / "B2B_CTACUSTOS_Importacoes"
-            imports.mkdir()
-            expected = imports / "SERVICOS-20260918-101500.xlsx"
-            expected.write_bytes(b"xlsx-placeholder")
+            services_path = synced_root / "SERVICOS_TESTE_MESMA_RAIZ.xlsx"
+            materials_path = synced_root / "MATERIAIS_TESTE_MESMA_RAIZ.xlsx"
+            services_path.write_bytes(b"services")
+            materials_path.write_bytes(b"materials")
 
             with patch.dict(
                 os.environ,
                 {
-                    "EXCEL_PATH": str(main_path),
-                    "SERVICES_EXCEL_PATH": "Z:\\outro-computador\\SERVICOS-20260918-101500.xlsx",
-                    "SERVICES_EXCEL_FILENAME": "SERVICOS.xlsx",
-                },
-                clear=False,
-            ):
-                repository = LocalExcelRepository(temp_root)
-                with patch.object(
-                    repository,
-                    "get_settings",
-                    return_value={
-                        "uploads": {
-                            "services": {
-                                "filename": expected.name,
-                                "path": "Z:\\outro-computador\\SERVICOS-20260918-101500.xlsx",
-                            }
-                        }
-                    },
-                ):
-                    located = repository._locate_reference_workbook("services")
-
-            self.assertEqual(located, expected.resolve())
-
-    def test_reference_search_recovers_latest_versioned_files_from_import_folder(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_root = Path(temp_dir)
-            main_path = temp_root / "B2B_CTACUSTOS.xlsx"
-            create_test_activity_workbook(main_path)
-            imports = temp_root / "B2B_CTACUSTOS_Importacoes"
-            imports.mkdir()
-            older = imports / "SERVICOS-20260917-090000.xlsx"
-            newer = imports / "SERVICOS-20260918-131800.xlsx"
-            older.write_bytes(b"old")
-            newer.write_bytes(b"new")
-            os.utime(older, (1, 1))
-            os.utime(newer, (2, 2))
-
-            with patch.dict(
-                os.environ,
-                {
-                    "EXCEL_PATH": str(main_path),
-                    "SERVICES_EXCEL_PATH": "Z:\\computador-antigo\\SERVICOS-20260916.xlsx",
-                    "SERVICES_EXCEL_FILENAME": "SERVICOS.xlsx",
-                },
-                clear=False,
-            ):
-                repository = LocalExcelRepository(temp_root)
-                with patch.object(repository, "get_settings", return_value={"uploads": {}}):
-                    located = repository._locate_reference_workbook("services")
-
-            self.assertEqual(located, newer.resolve())
-
-    def test_reference_search_checks_default_import_folder_when_configured_folder_is_stale(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_root = Path(temp_dir)
-            main_path = temp_root / "B2B_CTACUSTOS.xlsx"
-            create_test_activity_workbook(main_path)
-            imports = temp_root / "B2B_CTACUSTOS_Importacoes"
-            imports.mkdir()
-            expected = imports / "MATERIAIS-20260918.xlsx"
-            expected.write_bytes(b"materials")
-
-            with patch.dict(
-                os.environ,
-                {
-                    "EXCEL_PATH": str(main_path),
-                    "REFERENCE_UPLOAD_DIR": "Z:\\pasta-antiga\\Importacoes",
+                    "EXCEL_PATH": "",
+                    "EXCEL_SEARCH_ROOTS": str(temp_root / "OneDrive - Empresa"),
+                    "EXCEL_FILENAME": "B2B_CTACUSTOS.xlsx",
+                    "EXCEL_FALLBACK_SAMPLE": "false",
+                    "SERVICES_EXCEL_PATH": "",
+                    "SERVICES_EXCEL_FILENAME": services_path.name,
+                    "SERVICES_EXCEL_FILENAME_ALIASES": "",
                     "MATERIALS_EXCEL_PATH": "",
-                    "MATERIALS_EXCEL_FILENAME": "MATERIAL.xlsx",
+                    "MATERIALS_EXCEL_FILENAME": materials_path.name,
+                    "MATERIALS_EXCEL_FILENAME_ALIASES": "",
                 },
                 clear=False,
             ):
                 repository = LocalExcelRepository(temp_root)
-                with patch.object(repository, "get_settings", return_value={"uploads": {}}):
-                    located = repository._locate_reference_workbook("materials")
+                located_services = repository._locate_reference_workbook("services")
+                located_materials = repository._locate_reference_workbook("materials")
 
-            self.assertEqual(located, expected.resolve())
+            self.assertEqual(repository.file_path, main_path.resolve())
+            self.assertEqual(located_services, services_path.resolve())
+            self.assertEqual(located_materials, materials_path.resolve())
 
     def test_missing_services_does_not_block_material_catalog(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -748,7 +693,7 @@ class CalculationTests(unittest.TestCase):
                         "list_materials",
                         return_value={
                             "items": [{"key": "mat-1", "code": "1", "description": "Cabo", "unit": "M", "unit_price": 2}],
-                            "source": "MATERIAL.xlsx · aba MATERIAIS",
+                            "source": "MATERIAIS.xlsx · aba MATERIAIS",
                         },
                     ):
                         calculation = repository.get_service_calculation(activity["record_key"])
@@ -1309,38 +1254,6 @@ class CalculationTests(unittest.TestCase):
             self.assertEqual(created["custo_mo"], 777.5)
             self.assertEqual(created["custo_evitado"], 777.5)
             self.assertEqual(created["custo_total"], 800)
-
-    def test_reference_workbook_upload_is_saved_beside_main_excel(self):
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_root = Path(temp_dir)
-            data_dir = temp_root / "data"
-            data_dir.mkdir()
-            workbook_path = data_dir / "B2B_CTACUSTOS.xlsx"
-            create_test_activity_workbook(workbook_path)
-            source = workbook_path
-
-            with patch.dict(
-                os.environ,
-                {
-                    "EXCEL_SEARCH_ROOTS": "data",
-                    "EXCEL_FILENAME": workbook_path.name,
-                    "EXCEL_SHEET_NAME": "Atividades",
-                    "EXCEL_FALLBACK_SAMPLE": "false",
-                    "REFERENCE_UPLOAD_DIR": "",
-                },
-                clear=False,
-            ):
-                os.environ.pop("EXCEL_PATH", None)
-                repository = LocalExcelRepository(temp_root)
-                uploaded = repository.save_reference_workbook("services", "servicos.xlsx", source.read_bytes())
-                settings = repository.get_settings()
-
-            uploaded_path = Path(uploaded["path"])
-            self.assertTrue(uploaded_path.is_file())
-            self.assertEqual(uploaded_path.parent, data_dir / "B2B_CTACUSTOS_Importacoes")
-            self.assertEqual(settings["uploads"]["services"]["filename"], uploaded_path.name)
-            self.assertEqual(settings["uploads"]["services"]["path"], str(uploaded_path))
-
 
 if __name__ == "__main__":
     unittest.main()

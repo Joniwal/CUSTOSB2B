@@ -14,11 +14,11 @@ Aplicação local e responsiva para consultar e editar atividades armazenadas em
 - Campo DRAFT ao final da listagem e nos formulários de inclusão e edição.
 - Inclusão e edição pelo mesmo formulário, com opções de status, empresa, EPS e técnico administradas no próprio aplicativo.
 - Calculadora em duas abas, Materiais e Serviços, aberta pelo ícone antes de cada atividade e já vinculada ao registro correto.
-- Catálogos lidos de `MATERIAL.xlsx` e `SERVICOS.xlsx`, com seleção de itens, quantidades, subtotais, total de material e total de serviços.
+- Catálogos lidos de `MATERIAIS.xlsx` e `SERVICOS.xlsx`, com seleção de itens, quantidades, subtotais, total de material e total de serviços.
 - Página Configurações protegida por login, com custo mensal, mês, dias úteis, total de técnicos por categoria e cálculo automático do custo técnico/dia.
 - Cadastros para incluir, alterar ou excluir Status, Tipos de atividade, Tecnologias com valor de serviço, Técnicos, Empresas e EPS, salvos na aba `Config`.
 - Nos formulários de inclusão e edição, tecnologias configuradas preenchem o Custo Serviço automaticamente; ao selecionar `ERB`, o campo é liberado para receber o resultado de uma calculadora externa e o Custo Total é recalculado.
-- Upload local de planilhas `.xlsx` ou `.xlsm` de Serviços e Materiais para uma pasta sincronizada pelo OneDrive, sem Microsoft Graph.
+- Descoberta automática das três planilhas pelo nome nas pastas OneDrive/SharePoint sincronizadas, sem Microsoft Graph.
 - Botões Atualizar e Encerrar em todas as áreas principais.
 
 ### Preservação da tabela ao incluir
@@ -63,17 +63,17 @@ A base operacional também pode usar os cabeçalhos `Obra Executada`, `Status Ob
 
 Na primeira execução, Status, Tipos de atividade, Tecnologias, Técnicos, Empresas e EPS são sugeridos a partir dos registros existentes. Depois que a página Configurações for salva, a aba `Config` passa a ser a fonte desses seis cadastros. Excluir uma opção não altera o histórico da aba `Atividades`; apenas remove a opção dos novos formulários.
 
-### Acesso administrativo e bases auxiliares
+### Acesso administrativo e bases da calculadora
 
 Copie `.env.example` para `.env` e defina `ADMIN_USERNAME` e uma senha exclusiva em `ADMIN_PASSWORD` antes de iniciar ou distribuir o aplicativo. O arquivo `.env` é local, está ignorado pelo Git e não deve ser publicado. A sessão permanece apenas enquanto o navegador e o aplicativo estiverem abertos.
 
-As planilhas auxiliares ficam, por padrão, na pasta `B2B_CTACUSTOS_Importacoes`, criada ao lado do Excel principal. Como essa pasta já está dentro do OneDrive sincronizado, o próprio cliente do OneDrive faz o envio para a nuvem. Use `REFERENCE_UPLOAD_DIR` no `.env` apenas se quiser outro destino local.
+A base principal e as duas bases da calculadora são localizadas independentemente pelo nome, usando a mesma descoberta de pastas sincronizadas. Os nomes padrão são `B2B_CTACUSTOS.xlsx`, `SERVICOS.xlsx` e `MATERIAIS.xlsx`. Não é necessário enviar arquivos pela página Configurações nem manter uma pasta de importações.
 
-A calculadora procura `SERVICOS.xlsx` e `MATERIAL.xlsx` ao lado da base principal e em todas as bibliotecas OneDrive/SharePoint sincronizadas detectadas no computador, mesmo quando `EXCEL_SEARCH_ROOTS` aponta apenas para a base principal. Serviços aceita `CODIGO`, `SERVICO`, `CUSTO_UNITARIO` e `UNIDADE`. Materiais aceita `Mat_Code`, `Material`, `Unidade` e `Valor`. Código pode ficar vazio nas duas bases. Os nomes, abas e caminhos podem ser ajustados pelas variáveis `SERVICES_*` e `MATERIALS_*`; a comparação do nome da aba ignora maiúsculas, acentos e pontuação. Se o arquivo tiver uma única aba, ela será usada automaticamente.
+Serviços aceita `CODIGO`, `SERVICO`, `CUSTO_UNITARIO` e `UNIDADE`. Materiais aceita `Mat_Code`, `Material`, `Unidade` e `Valor`. Código pode ficar vazio nas duas bases. Os nomes, abas e caminhos podem ser ajustados pelas variáveis `SERVICES_*` e `MATERIALS_*`; a comparação do nome da aba ignora maiúsculas, acentos e pontuação. Se o arquivo tiver uma única aba, ela será usada automaticamente.
 
-A busca também aceita `MATERIAIS.xlsx`, `SERVIÇOS.xlsx` e as mesmas variantes em `.xlsm`. Nomes alternativos podem ser definidos em `MATERIALS_EXCEL_FILENAME_ALIASES` e `SERVICES_EXCEL_FILENAME_ALIASES`, separados por `;`. O nome principal tem prioridade. Um caminho absoluto antigo em `SERVICES_EXCEL_PATH` ou `MATERIALS_EXCEL_PATH` não interrompe mais a busca quando não existe no computador atual. Arquivos no SharePoint precisam estar sincronizados com este computador pelo OneDrive e visíveis no Explorador de Arquivos; um link de compartilhamento ou arquivo disponível apenas no navegador não é acessado sem uma API de nuvem. A base principal deste projeto permanece `B2B_CTACUSTOS.xlsx`, aba `Atividades`; `ATIVACAO.xlsx` com outro esquema não a substitui.
+A busca também aceita `MATERIAL.xlsx`, `SERVIÇOS.xlsx` e as mesmas variantes em `.xlsm`. Nomes alternativos podem ser definidos em `MATERIALS_EXCEL_FILENAME_ALIASES` e `SERVICES_EXCEL_FILENAME_ALIASES`, separados por `;`. O nome principal tem prioridade. Um caminho absoluto antigo em `SERVICES_EXCEL_PATH` ou `MATERIALS_EXCEL_PATH` não interrompe a busca quando não existe no computador atual. Arquivos no SharePoint precisam estar sincronizados com este computador pelo OneDrive, visíveis no Explorador de Arquivos e disponíveis localmente; um link de compartilhamento ou arquivo disponível apenas no navegador não é acessado sem uma API de nuvem. A base principal deste projeto permanece `B2B_CTACUSTOS.xlsx`, aba `Atividades`; `ATIVACAO.xlsx` com outro esquema não a substitui.
 
-Para validar uma nova máquina, abra a biblioteca compartilhada no Explorador de Arquivos e confirme que `SERVICOS.xlsx`/`SERVIÇOS.xlsx` e `MATERIAL.xlsx`/`MATERIAIS.xlsx` aparecem localmente. Se estiverem somente na seção “Compartilhado” do site, use **Sincronizar** ou **Adicionar atalho ao Meu OneDrive** no SharePoint e aguarde o cliente do OneDrive concluir. Para um `.env` portátil, deixe `SERVICES_EXCEL_PATH=` e `MATERIALS_EXCEL_PATH=` vazios. Se houver duas cópias com o mesmo nome, informe o caminho correto para eliminar a ambiguidade.
+Para validar uma nova máquina, abra a biblioteca compartilhada no Explorador de Arquivos e confirme que as três planilhas aparecem localmente. Se estiverem somente na seção “Compartilhado” do site, use **Sincronizar** ou **Adicionar atalho ao Meu OneDrive** no SharePoint e aguarde o cliente do OneDrive concluir. Marque os arquivos como **Sempre manter neste dispositivo**. Para um `.env` portátil, deixe `EXCEL_PATH=`, `SERVICES_EXCEL_PATH=` e `MATERIALS_EXCEL_PATH=` vazios. Se houver duas cópias com o mesmo nome, informe o caminho correto para eliminar a ambiguidade.
 
 É possível restringir a procura a várias raízes em `EXCEL_SEARCH_ROOTS`, separadas por `;` no Windows. Se houver mais de uma cópia com o mesmo nome, o aplicativo interrompe a inicialização e mostra os caminhos encontrados, evitando gravar silenciosamente no arquivo errado.
 
@@ -160,7 +160,6 @@ O resultado fica em `dist/B2B_CTACUSTOS/`. O ícone `web/static/favicon.ico` é 
 - `POST /api/service-calculation?activity={referência}`: salva os itens, atualiza o Custo Serviço na coluna compatível do Excel e recalcula Custo Total.
 - `POST /api/admin/login` e `POST /api/admin/logout`: controlam a sessão administrativa local.
 - `GET/POST /api/settings`: consulta ou salva indicadores e cadastros; exige login administrativo.
-- `POST /api/admin/upload`: salva uma planilha auxiliar de Serviços ou Materiais; exige login administrativo.
 - `POST /api/shutdown`: encerra o servidor; disponível apenas em localhost.
 
 ## Testes

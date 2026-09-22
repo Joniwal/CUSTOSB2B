@@ -8,7 +8,7 @@
   <title>Configurações · B2B CTACUSTOS</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="alternate icon" href="/favicon.ico">
-  <link rel="stylesheet" href="/static/app.css?v=20260916-1">
+  <link rel="stylesheet" href="/static/app.css?v=20260922-1">
 </head>
 <body data-page="settings">
   <a class="skip-link" href="#conteudo">Ir para o conteúdo principal</a>
@@ -50,7 +50,7 @@
 
       <div id="admin-content" hidden>
         <section class="page-heading">
-          <div><p class="eyebrow">Administração</p><h1>Configurações</h1><p>Gerencie custos, cadastros e planilhas de referência.</p></div>
+          <div><p class="eyebrow">Administração</p><h1>Configurações</h1><p>Gerencie custos e cadastros do aplicativo.</p></div>
           <div class="page-heading__actions">
             <button class="button button--secondary button--logout" id="admin-logout-button" type="button">Sair</button>
             <button class="button button--secondary" id="refresh-button" type="button"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M20 6v5h-5M4 18v-5h5"/><path d="M6.1 9a7 7 0 0 1 11.6-2.6L20 11M4 13l2.3 4.6A7 7 0 0 0 18 15"/></svg><span>Atualizar</span></button>
@@ -112,23 +112,6 @@
             </section>
           </div>
 
-          <section class="panel reference-uploads" aria-labelledby="reference-uploads-title">
-            <header class="panel__header"><div><p class="eyebrow">Bases auxiliares</p><h2 id="reference-uploads-title">Planilhas para a calculadora</h2></div><span class="chip">Excel local</span></header>
-            <div class="reference-uploads__body">
-              <article class="upload-card">
-                <div><h3>Serviços</h3><p id="services-upload-status">Nenhuma planilha enviada.</p></div>
-                <input class="sr-only" id="services-upload" type="file" accept=".xlsx,.xlsm" data-reference-file="services">
-                <button class="button button--secondary" type="button" data-upload-trigger="services">Selecionar planilha</button>
-              </article>
-              <article class="upload-card">
-                <div><h3>Materiais</h3><p id="materials-upload-status">Nenhuma planilha enviada.</p></div>
-                <input class="sr-only" id="materials-upload" type="file" accept=".xlsx,.xlsm" data-reference-file="materials">
-                <button class="button button--secondary" type="button" data-upload-trigger="materials">Selecionar planilha</button>
-              </article>
-              <p class="upload-directory">Destino no computador: <strong id="upload-directory">—</strong>. O OneDrive sincroniza essa pasta sem Microsoft Graph.</p>
-            </div>
-          </section>
-
           <section class="panel settings-footer settings-footer--page" aria-label="Salvar configurações">
             <p id="settings-status" role="status" aria-live="polite">Edite os campos e salve para atualizar a aba Config do Excel.</p>
             <button class="button button--primary" type="submit" id="settings-save">Salvar configurações</button>
@@ -138,6 +121,6 @@
     </main>
   </div>
   <div class="toast-region" id="toast-region" role="status" aria-live="polite"></div>
-  <script src="/static/app.js?v=20260916-1" defer></script>
+  <script src="/static/app.js?v=20260922-1" defer></script>
 </body>
 </html>

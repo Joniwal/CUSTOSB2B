@@ -1115,7 +1115,7 @@
     document.querySelector("#service-catalog-count").textContent = "—";
     document.querySelector("#material-catalog-count").textContent = "—";
     document.querySelector("#service-catalog-list").innerHTML = '<div class="service-loading"><div class="spinner" aria-hidden="true"></div><p>Lendo SERVICOS.xlsx…</p></div>';
-    document.querySelector("#material-catalog-list").innerHTML = '<div class="service-loading"><div class="spinner" aria-hidden="true"></div><p>Lendo MATERIAL.xlsx…</p></div>';
+    document.querySelector("#material-catalog-list").innerHTML = '<div class="service-loading"><div class="spinner" aria-hidden="true"></div><p>Lendo MATERIAIS.xlsx…</p></div>';
     renderSelectedMaterials();
     renderSelectedServices();
     showServiceCalculator();
@@ -1129,7 +1129,7 @@
         ...item,
         quantity: Number(item.quantity || 1),
       }));
-      serviceCalculatorState.materialSource = data.material_source || "MATERIAL.xlsx";
+      serviceCalculatorState.materialSource = data.material_source || "MATERIAIS.xlsx";
       serviceCalculatorState.materialsError = data.materials_error || "";
       serviceCalculatorState.materialsChanged = false;
       serviceCalculatorState.services = data.services || [];
@@ -1333,8 +1333,6 @@
     updateCatalogCount(key);
   }
 
-  const settingsState = { uploads: { services: {}, materials: {} } };
-
   function businessDaysInMonth(monthValue) {
     const [year, month] = String(monthValue || "").split("-").map(Number);
     if (!year || !month) return 0;
@@ -1355,20 +1353,6 @@
     document.querySelector("#daily-rate-formula").textContent = `${money.format(monthlyCost)} ÷ ${businessDays} ${businessDays === 1 ? "dia útil" : "dias úteis"}`;
   }
 
-  function renderUpload(kind, metadata = {}) {
-    const status = document.querySelector(`#${kind}-upload-status`);
-    if (!status) return;
-    if (metadata.filename) {
-      status.textContent = metadata.uploaded_at
-        ? `${metadata.filename} · ${new Date(metadata.uploaded_at).toLocaleString("pt-BR")}`
-        : metadata.filename;
-      status.title = metadata.path || metadata.filename;
-    } else {
-      status.textContent = "Nenhuma planilha enviada.";
-      status.removeAttribute("title");
-    }
-  }
-
   function renderSettings(settings) {
     document.querySelector("#reference-month").value = settings.reference_month || "";
     document.querySelector("#monthly-technician-cost").value = Number(settings.monthly_technician_cost || 0).toFixed(2);
@@ -1379,10 +1363,6 @@
       const input = document.querySelector(`#category-team-${category}`);
       if (input) input.value = teams[category] || 0;
     });
-    document.querySelector("#upload-directory").textContent = settings.upload_directory || "—";
-    settingsState.uploads = settings.uploads || { services: {}, materials: {} };
-    renderUpload("services", settingsState.uploads.services);
-    renderUpload("materials", settingsState.uploads.materials);
     recalculateDailyRate();
     Object.keys(catalogDefinitions).forEach((key) => {
       renderCatalog(key, key === "technologies" ? settings.technology_rates : settings[key]);
@@ -1436,42 +1416,6 @@
     }
   }
 
-  async function uploadReference(kind, file) {
-    const labels = { services: "serviços", materials: "materiais" };
-    const button = document.querySelector(`[data-upload-trigger="${kind}"]`);
-    const status = document.querySelector(`#${kind}-upload-status`);
-    if (!/\.(xlsx|xlsm)$/i.test(file.name)) {
-      toast("Arquivo não aceito", "Selecione uma planilha .xlsx ou .xlsm.", true);
-      return;
-    }
-    if (file.size > 25 * 1024 * 1024) {
-      toast("Arquivo muito grande", "A planilha deve ter no máximo 25 MB.", true);
-      return;
-    }
-    button.disabled = true;
-    status.textContent = "Enviando para a pasta sincronizada…";
-    try {
-      const data = await getJson(`/api/admin/upload?kind=${encodeURIComponent(kind)}&filename=${encodeURIComponent(file.name)}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/octet-stream" },
-        body: file,
-      });
-      settingsState.uploads[kind] = data.upload;
-      renderUpload(kind, data.upload);
-      document.querySelector("#upload-directory").textContent = data.upload.directory;
-      toast("Planilha enviada", `A base de ${labels[kind]} foi salva na pasta sincronizada.`);
-    } catch (error) {
-      if (error.status === 401) showAdminLogin("Sua sessão terminou. Entre novamente.");
-      else {
-        status.textContent = "Não foi possível enviar a planilha.";
-        toast("Falha no envio", error.message, true);
-      }
-    } finally {
-      button.disabled = false;
-      document.querySelector(`#${kind}-upload`).value = "";
-    }
-  }
-
   function setupSettings() {
     const form = document.querySelector("#settings-form");
     const loginForm = document.querySelector("#admin-login-form");
@@ -1504,13 +1448,6 @@
         showAdminLogin("Sessão encerrada.");
       }
     });
-
-    document.querySelectorAll("[data-upload-trigger]").forEach((button) => button.addEventListener("click", () => {
-      document.querySelector(`#${button.dataset.uploadTrigger}-upload`).click();
-    }));
-    document.querySelectorAll("[data-reference-file]").forEach((input) => input.addEventListener("change", () => {
-      if (input.files?.[0]) uploadReference(input.dataset.referenceFile, input.files[0]);
-    }));
 
     document.querySelector("#reference-month").addEventListener("change", (event) => {
       document.querySelector("#business-days").value = businessDaysInMonth(event.target.value);
@@ -1573,7 +1510,6 @@
             technicians: collectCatalog("technicians"),
             companies: collectCatalog("companies"),
             eps: collectCatalog("eps"),
-            uploads: settingsState.uploads,
           }),
         });
         renderSettings(data.settings);

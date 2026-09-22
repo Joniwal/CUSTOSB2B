@@ -353,10 +353,6 @@ class RequestHandler(BaseHTTPRequestHandler):
         if path == "/api/admin/logout":
             self._admin_logout()
             return
-        if path == "/api/admin/upload":
-            if self._require_admin():
-                self._upload_reference(parse_qs(parsed.query))
-            return
         if path == "/api/activities":
             self._create_activity()
             return
@@ -440,22 +436,6 @@ class RequestHandler(BaseHTTPRequestHandler):
                 "Set-Cookie": f"{ADMIN_SESSION_COOKIE}=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict"
             },
         )
-
-    def _upload_reference(self, query: dict[str, list[str]]) -> None:
-        try:
-            content_length = int(self.headers.get("Content-Length", "0"))
-            if content_length <= 0 or content_length > 25 * 1024 * 1024:
-                raise ValueError("A planilha deve ter no máximo 25 MB.")
-            kind = query.get("kind", [""])[0]
-            filename = query.get("filename", [""])[0]
-            uploaded = self.server.repository.save_reference_workbook(
-                kind, filename, self.rfile.read(content_length)
-            )
-            self._json({"ok": True, "upload": uploaded}, HTTPStatus.CREATED)
-        except ValueError as exc:
-            self._error(str(exc))
-        except RepositoryError as exc:
-            self._error(str(exc), HTTPStatus.CONFLICT)
 
     def _settings(self) -> None:
         try:
