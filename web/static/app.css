@@ -434,6 +434,10 @@ svg { display: block; }
 
 .list-panel { max-width: 1460px; margin: 0 auto; }
 .filters { display: grid; grid-template-columns: minmax(240px, 1fr) repeat(3, minmax(155px, 190px)) auto; gap: 12px; padding: 18px 20px; border-bottom: 1px solid var(--color-border); }
+.date-filters { display: grid; grid-column: 1 / -1; grid-template-columns: repeat(4, minmax(150px, 210px)); align-items: end; gap: 12px; padding-top: 2px; }
+.date-filters .input-group { gap: 4px; }
+.date-filters select, .date-filters input { width: 100%; height: 38px; padding: 0 11px; border: 1px solid var(--color-border); border-radius: 8px; background: white; color: var(--color-text); font: inherit; font-size: 11px; }
+.date-filters select:focus, .date-filters input:focus { border-color: var(--color-primary-strong); outline: 3px solid rgb(122 47 115 / 12%); }
 .field { position: relative; min-width: 0; }
 .field input, .field select, .input-group input, .input-group select {
   width: 100%;
@@ -610,7 +614,7 @@ th[aria-sort="descending"] .sort-button span::after { content: "↓"; font-size:
 .service-calculator__footer { flex: 0 0 auto; }
 
 @media (min-width: 1200px) {
-  #services-panel .service-summary { gap: 10px; padding: 12px 18px; overflow-y: auto; scrollbar-gutter: stable; }
+  #services-panel .service-summary { gap: 10px; padding: 12px 18px; overflow: hidden; scrollbar-gutter: auto; }
   #services-panel .service-summary__activity { padding-bottom: 8px; }
   #services-panel .service-summary__drivers input { height: 32px; }
   #services-panel .service-summary dl { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 12px; }
@@ -629,10 +633,10 @@ th[aria-sort="descending"] .sort-button span::after { content: "↓"; font-size:
 @media (min-width: 1200px) and (max-height: 900px) {
   .service-modal { width: min(1540px, calc(100vw - 18px)); max-height: calc(100dvh - 16px); }
   .service-calculator { height: calc(100dvh - 16px); max-height: calc(100dvh - 16px); }
-  .service-calculator__header { min-height: 74px; padding: 10px 18px; }
-  .service-calculator__header h2 { font-size: 18px; }
+  .service-calculator__header { min-height: 62px; padding: 7px 18px; }
+  .service-calculator__header h2 { font-size: 17px; }
   .service-source { margin-top: 3px; font-size: 9px; }
-  .calculator-tab { min-height: 40px; }
+  .calculator-tab { min-height: 36px; }
   .service-pane__header { min-height: 54px; padding: 8px 14px; }
   .service-search { margin: 9px 12px 6px; }
   .service-search input { height: 36px; }
@@ -641,16 +645,20 @@ th[aria-sort="descending"] .sort-button span::after { content: "↓"; font-size:
   .service-catalog-item { min-height: 58px; padding-top: 8px; padding-bottom: 8px; }
   .selected-services-table__head { min-height: 34px; }
   .selected-service-row { min-height: 60px; padding-top: 8px; padding-bottom: 8px; }
-  .service-calculator__footer { min-height: 56px; padding: 7px 18px; }
-  #services-panel .service-summary { gap: 6px; padding: 9px 14px; overflow-y: auto; }
+  .service-calculator__footer { min-height: 52px; padding: 6px 18px; }
+  #services-panel .service-summary { gap: 4px; padding: 7px 12px; overflow: hidden; }
   #services-panel .service-summary__activity { grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; padding-bottom: 6px; }
-  #services-panel .service-summary__activity strong { font-size: 18px; }
-  #services-panel .service-summary__drivers { gap: 6px; }
-  #services-panel .service-summary__drivers input { height: 30px; }
-  #services-panel .service-summary dl { gap: 5px 10px; }
-  #services-panel .service-summary__total { margin-top: 0; gap: 3px; padding: 8px 10px; }
-  #services-panel .service-summary__total > output { font-size: 22px; }
-  #services-panel .service-summary__gap { min-height: 58px; margin-top: 3px; padding: 6px 8px; }
+  #services-panel .service-summary__activity strong { font-size: 16px; }
+  #services-panel .service-summary__drivers { gap: 5px; }
+  #services-panel .service-summary__drivers input { height: 27px; }
+  #services-panel .service-summary dl { gap: 4px 9px; }
+  #services-panel .service-summary dt { font-size: 7px; }
+  #services-panel .service-summary dd, #services-panel .service-summary__standard dd strong { font-size: 10px; }
+  #services-panel .service-summary__standard dd small { font-size: 7px; }
+  #services-panel .service-summary__total { margin-top: 0; gap: 2px; padding: 7px 9px; }
+  #services-panel .service-summary__total > output { font-size: 20px; }
+  #services-panel .service-summary__gap { min-height: 50px; margin-top: 2px; padding: 5px 7px; }
+  #services-panel .service-summary__gap output { font-size: 12px; }
   .service-summary > p { display: none; }
 }
 
@@ -789,6 +797,7 @@ th[aria-sort="descending"] .sort-button span::after { content: "↓"; font-size:
   .panel--status, .panel--financial { min-height: 270px; }
   .filters { grid-template-columns: minmax(220px, 1fr) repeat(2, minmax(150px, 1fr)); }
   .filters .button { justify-self: stretch; }
+  .date-filters { grid-template-columns: repeat(2, minmax(150px, 1fr)); }
   .form-grid--four, .form-grid--five { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .period-filter { align-items: stretch; flex-direction: column; }
   .period-filter__mode { grid-template-columns: repeat(3, minmax(0, 1fr)); }
@@ -969,6 +978,7 @@ th[aria-sort="descending"] .sort-button span::after { content: "↓"; font-size:
   .legend { width: 100%; grid-template-columns: 1fr 1fr; }
   .filters { grid-template-columns: 1fr; }
   .field--search, .filters .button { grid-column: 1; }
+  .date-filters { grid-template-columns: 1fr; }
   .form-grid--three, .form-grid--four, .form-grid--five { grid-template-columns: 1fr; }
   .input-group--wide { grid-column: auto; }
   .period-filter__mode { grid-template-columns: 1fr; }

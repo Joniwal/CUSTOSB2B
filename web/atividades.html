@@ -8,7 +8,7 @@
   <title>Atividades · B2B CTACUSTOS</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="alternate icon" href="/favicon.ico">
-  <link rel="stylesheet" href="/static/app.css?v=20260922-1">
+  <link rel="stylesheet" href="/static/app.css?v=20260924-1">
 </head>
 <body data-page="activities">
   <a class="skip-link" href="#conteudo">Ir para o conteúdo principal</a>
@@ -84,7 +84,7 @@
         </div>
         <div class="page-heading__actions">
           <span class="result-count" id="result-count">Carregando…</span>
-          <a class="button button--secondary" id="export-button" href="/api/activities/export" download aria-label="Exportar atividades para Excel sem a coluna DRAFT" title="Exportar Excel sem DRAFT">
+          <a class="button button--secondary" id="export-button" href="/api/activities/export" download aria-label="Exportar atividades filtradas para Excel" title="Exportar as colunas originais com os filtros ativos">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M5 20h14"/></svg>
             <span>Exportar Excel</span>
           </a>
@@ -127,6 +127,12 @@
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></svg>
           </div>
           <button class="button button--secondary" id="clear-filters" type="button">Limpar filtros</button>
+          <div class="date-filters" aria-label="Filtro por período">
+            <label class="input-group"><span>Período</span><select id="period-filter" name="period"><option value="all">Todas as datas</option><option value="month">Por mês</option><option value="custom">Entre datas</option></select></label>
+            <label class="input-group" id="month-filter-field"><span>Mês</span><input id="month-filter" name="month" type="month"></label>
+            <label class="input-group" id="start-filter-field"><span>Data inicial</span><input id="start-filter" name="start" type="date"></label>
+            <label class="input-group" id="end-filter-field"><span>Data final</span><input id="end-filter" name="end" type="date"></label>
+          </div>
         </form>
 
         <div class="selection-bar" id="selection-bar" hidden>
@@ -361,6 +367,6 @@
   </dialog>
 
   <div class="toast-region" id="toast-region" role="status" aria-live="polite"></div>
-  <script src="/static/app.js?v=20260922-1" defer></script>
+  <script src="/static/app.js?v=20260924-1" defer></script>
 </body>
 </html>

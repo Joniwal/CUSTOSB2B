@@ -20,7 +20,7 @@ from excel_repository import (  # noqa: E402
     summarize_activities,
     summarize_service_categories,
 )
-from app import load_env  # noqa: E402
+from app import filter_activities, load_env  # noqa: E402
 
 
 def create_test_activity_workbook(path: Path) -> None:
@@ -96,6 +96,10 @@ class CalculationTests(unittest.TestCase):
         self.assertIn('id="service-days"', html)
         self.assertIn('name="draft"', html)
         self.assertIn('id="export-button"', html)
+        self.assertIn('id="period-filter"', html)
+        self.assertIn('id="month-filter"', html)
+        self.assertIn('id="start-filter"', html)
+        self.assertIn('id="end-filter"', html)
         self.assertIn('id="form-technology"', html)
         self.assertIn('name="allow_duplicate_id"', html)
         self.assertIn('value="true"', html)
@@ -737,7 +741,22 @@ class CalculationTests(unittest.TestCase):
             with self.subTest(value=value):
                 self.assertEqual(normalize_activity({"data": value})["data"], "2026-09-01")
 
-    def test_draft_is_saved_and_export_omits_it_without_losing_table_style(self):
+    def test_activity_filters_accept_month_and_custom_date_range(self):
+        activities = [
+            {"id": "1", "data": "2026-08-31"},
+            {"id": "2", "data": "2026-09-01"},
+            {"id": "3", "data": "2026-09-15"},
+            {"id": "4", "data": "2026-10-01"},
+        ]
+        by_month = filter_activities(activities, {"period": ["month"], "month": ["2026-09"]})
+        by_range = filter_activities(
+            activities,
+            {"period": ["custom"], "start": ["2026-09-10"], "end": ["2026-10-01"]},
+        )
+        self.assertEqual([item["id"] for item in by_month], ["2", "3"])
+        self.assertEqual([item["id"] for item in by_range], ["3", "4"])
+
+    def test_draft_is_saved_and_export_uses_formatted_summary(self):
         import openpyxl
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -762,7 +781,7 @@ class CalculationTests(unittest.TestCase):
                 activity = repository.list_activities()[0]
                 activity["draft"] = "DRAFT-001"
                 repository.update_activity(activity["record_key"], activity)
-                export_name, export_bytes = repository.export_activities()
+                export_name, export_bytes = repository.export_activities([activity])
 
             source_workbook = openpyxl.load_workbook(workbook_path, data_only=False)
             source_sheet = source_workbook["Atividades"]
@@ -772,17 +791,26 @@ class CalculationTests(unittest.TestCase):
             self.assertEqual(len(source_sheet.tables["AtividadesTestTable"].tableColumns), 20)
             self.assertEqual(source_sheet.tables["AtividadesTestTable"].tableColumns[-1].name, "DRAFT")
             self.assertEqual(source_sheet.tables["AtividadesTestTable"].autoFilter.ref, "A1:T6")
-            source_header_color = source_sheet["A1"].fill.fgColor.rgb
             source_workbook.close()
 
             exported_workbook = openpyxl.load_workbook(io.BytesIO(export_bytes), data_only=False)
             exported_sheet = exported_workbook["Atividades"]
             exported_headers = [cell.value for cell in exported_sheet[1]]
-            self.assertNotIn("DRAFT", exported_headers)
-            self.assertEqual(exported_sheet["A1"].fill.fgColor.rgb, source_header_color)
-            self.assertEqual(exported_sheet.tables["AtividadesTestTable"].ref, "A1:S6")
-            self.assertEqual(len(exported_sheet.tables["AtividadesTestTable"].tableColumns), 19)
-            self.assertTrue(export_name.startswith("ATIVIDADES_"))
+            self.assertEqual(
+                exported_headers,
+                [
+                    "ID", "Data", "Tipo de Atividade", "Status", "Situação", "Tecnologia",
+                    "Empresa", "EPS", "Matrícula", "Nome do Técnico", "Custo Serviço",
+                    "Custo Material", "Custo Total", "Custo Evitado", "Qtde Técnicos",
+                    "Qtde Dias", "GAP", "DRAFT",
+                ],
+            )
+            self.assertEqual(exported_sheet["R2"].value, "DRAFT-001")
+            self.assertEqual(exported_sheet["A1"].fill.fgColor.rgb, "007A2F73")
+            self.assertEqual(exported_sheet["K2"].number_format, '"R$" #,##0.00')
+            self.assertEqual(exported_sheet.tables["AtividadesExportadas"].ref, "A1:R2")
+            self.assertEqual(len(exported_sheet.tables["AtividadesExportadas"].tableColumns), 18)
+            self.assertTrue(export_name.startswith("ATIVIDADES_RESUMO_"))
             exported_workbook.close()
 
     def test_discovery_uses_current_users_onedrive_environment(self):

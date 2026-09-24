@@ -92,21 +92,30 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(data["pagination"]["total"], 1)
         self.assertEqual(data["items"][0]["draft"], "RASCUNHO-1")
 
-    def test_export_download_omits_draft_and_does_not_modify_source(self):
+    def test_export_uses_stable_summary_applies_month_and_does_not_modify_source(self):
         import openpyxl
 
         before = self.path.read_bytes()
-        with urlopen(self.url + "/api/activities/export", timeout=5) as response:
+        with urlopen(self.url + "/api/activities/export?period=month&month=2026-09", timeout=5) as response:
             self.assertIn("attachment", response.headers["Content-Disposition"])
             self.assertEqual(response.headers["Content-Type"], "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
             exported = openpyxl.load_workbook(io.BytesIO(response.read()))
         sheet = exported["Atividades"]
-        self.assertEqual(sheet.max_column, 12)
-        self.assertEqual(sheet.max_row, 5)
-        self.assertNotIn("DRAFT", [cell.value for cell in sheet[1]])
-        self.assertEqual(sheet["G2"].number_format, '"R$" #,##0.00')
-        self.assertEqual(sheet["A1"].fill.fgColor.rgb, "00DD7FD4")
-        self.assertEqual(sheet.tables["Atividades"].ref, "A1:L5")
+        expected_headers = [
+            "ID", "Data", "Tipo de Atividade", "Status", "Situação", "Tecnologia",
+            "Empresa", "EPS", "Matrícula", "Nome do Técnico", "Custo Serviço",
+            "Custo Material", "Custo Total", "Custo Evitado", "Qtde Técnicos",
+            "Qtde Dias", "GAP", "DRAFT",
+        ]
+        self.assertEqual([cell.value for cell in sheet[1]], expected_headers)
+        self.assertEqual(sheet.max_column, 18)
+        self.assertEqual(sheet.max_row, 3)
+        self.assertEqual(sheet["R2"].value, "RASCUNHO-1")
+        self.assertEqual(sheet["K2"].number_format, '"R$" #,##0.00')
+        self.assertEqual(sheet["B2"].number_format, "dd/mm/yyyy")
+        self.assertEqual(sheet["A1"].fill.fgColor.rgb, "007A2F73")
+        self.assertEqual(sheet.tables["AtividadesExportadas"].ref, "A1:R3")
+        self.assertEqual(sheet.freeze_panes, "A2")
         exported.close()
         self.assertEqual(self.path.read_bytes(), before)
 

@@ -10,7 +10,8 @@ Aplicação local e responsiva para consultar e editar atividades armazenadas em
 - Blocos mensais de Implantação, Reparo e Ativação, cada um com Serviços, Materiais, Custo Total, GAP, quantidade de técnicos e valor da equipe.
 - Gráficos por tipo de atividade, técnico e empresa, alternando quantidade, custo e GAP.
 - Tabelas de resumo por tipo de atividade e tecnologia, com totais de Serviços e GAP do período filtrado.
-- Exportar Excel na página Atividades, preservando estilos e a tabela, sem a coluna DRAFT.
+- Filtros por mês ou intervalo de datas na página Atividades, aplicados também à exportação.
+- Exportar Excel em uma versão resumida, com colunas fixas e formatação profissional, incluindo DRAFT.
 - Campo DRAFT ao final da listagem e nos formulários de inclusão e edição.
 - Inclusão e edição pelo mesmo formulário, com opções de status, empresa, EPS e técnico administradas no próprio aplicativo.
 - Calculadora em duas abas, Materiais e Serviços, aberta pelo ícone antes de cada atividade e já vinculada ao registro correto.
@@ -25,7 +26,7 @@ Aplicação local e responsiva para consultar e editar atividades armazenadas em
 
 Ao atualizar uma atividade, somente os valores das células correspondentes são alterados. Ao incluir, o aplicativo copia a formatação da última linha, mantém os formatos numéricos e amplia o intervalo da Tabela do Excel para abranger a nova linha. Para evitar conflitos de gravação, feche a planilha no Excel antes de incluir, editar ou salvar configurações.
 
-A coluna `DRAFT` é preservada na base e criada ao final, quando ausente, na primeira gravação. O botão **Exportar Excel** baixa a aba completa de atividades, sem `DRAFT`, mantendo os estilos das células, larguras, filtros e estilo da tabela. A exportação não modifica o arquivo original e não depende da paginação ou dos filtros da tela.
+A coluna `DRAFT` é preservada na base e criada ao final, quando ausente, na primeira gravação. O botão **Exportar Excel** gera uma versão resumida estável com ID, data, atividade, status, situação, tecnologia, empresa, EPS, matrícula, técnico, custos, quantidades, GAP e DRAFT. O arquivo exportado possui cabeçalho formatado, tabela com filtros, linhas alternadas, painel congelado e formatos próprios para datas, moeda e números. A exportação respeita os filtros ativos — inclusive mês ou intervalo de datas — sem depender da paginação e sem modificar o arquivo original.
 
 As telas principais oferecem **Atualizar**, que relê os dados do arquivo Excel, e **Encerrar**, que finaliza o servidor local e libera a porta. O encerramento exige confirmação e só é aceito a partir do próprio computador.
 
@@ -153,7 +154,7 @@ O resultado fica em `dist/B2B_CTACUSTOS/`. O ícone `web/static/favicon.ico` é 
 - `GET /api/health`: conexão e fonte ativa.
 - `GET /api/dashboard`: métricas, comparação e resumos por atividade/tecnologia; filtros `month`, `start`, `end` e `technology`.
 - `GET /api/activities`: filtros `q`, `status`, `type`, `technology`, `sort`, `direction`, `page` e `per_page`.
-- `GET /api/activities/export`: baixa a aba de atividades formatada, sem DRAFT.
+- `GET /api/activities/export`: baixa a versão resumida formatada com colunas fixas e os filtros ativos.
 - `POST /api/activities`: inclui uma atividade e amplia a tabela formatada do Excel.
 - `PUT /api/activities/{referência}`: valida e atualiza a linha exata da atividade.
 - `GET /api/service-calculation?activity={referência}`: carrega catálogo, atividade e cálculo já salvo.

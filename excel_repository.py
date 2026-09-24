@@ -126,6 +126,27 @@ DEFAULT_TECHNOLOGIES = (
     "RETIRADA EQUIPAMENTOS",
 )
 
+EXPORT_COLUMNS = (
+    ("ID", "id", "text"),
+    ("Data", "data", "date"),
+    ("Tipo de Atividade", "tipo_atividade", "text"),
+    ("Status", "status", "text"),
+    ("Situação", "situacao", "text"),
+    ("Tecnologia", "tecnologia", "text"),
+    ("Empresa", "empresa", "text"),
+    ("EPS", "eps", "text"),
+    ("Matrícula", "matricula", "text"),
+    ("Nome do Técnico", "tecnico_nome", "text"),
+    ("Custo Serviço", "custo_mo", "currency"),
+    ("Custo Material", "custo_mat", "currency"),
+    ("Custo Total", "custo_total", "currency"),
+    ("Custo Evitado", "custo_evitado", "currency"),
+    ("Qtde Técnicos", "qtde_tecnicos", "integer"),
+    ("Qtde Dias", "qtde_dias", "integer"),
+    ("GAP", "gap", "currency"),
+    ("DRAFT", "draft", "text"),
+)
+
 SERVICE_CALC_SHEET = "Calculo_Servicos"
 SERVICE_CALC_HEADERS = [
     "Chave Registro",
@@ -799,6 +820,7 @@ class LocalExcelRepository:
         )
         self.sheet_name = os.getenv("EXCEL_SHEET_NAME", "Atividades")
         self._lock = threading.RLock()
+        self._reference_paths: dict[str, Path] = {}
         self.file_path = self._locate_file()
         sample_path = (self.base_dir / "data" / self.file_name).resolve()
         self.is_sample = os.path.normcase(str(self.file_path)) == os.path.normcase(str(sample_path))
@@ -872,6 +894,10 @@ class LocalExcelRepository:
             raise ValueError("Tipo de planilha de referência inválido.")
         prefix, default_name, default_aliases, label = definitions[kind]
 
+        cached = self._reference_paths.get(kind)
+        if cached and cached.is_file():
+            return cached
+
         explicit = os.getenv(f"{prefix}_EXCEL_PATH", "").strip()
         if explicit:
             path = Path(explicit).expanduser()
@@ -879,6 +905,7 @@ class LocalExcelRepository:
                 path = self.file_path.parent / path
             path = path.resolve()
             if path.is_file() and path.suffix.casefold() in {".xlsx", ".xlsm"}:
+                self._reference_paths[kind] = path
                 return path
             if path.is_file():
                 raise RepositoryError(f"A planilha de {label} deve ser .xlsx ou .xlsm.")
@@ -906,13 +933,34 @@ class LocalExcelRepository:
                 seen_names.add(normalized_name)
                 unique_names.append(candidate_name)
 
+        # A instalação portátil normalmente mantém as três bases na mesma
+        # pasta sincronizada. Resolva esse caso primeiro para evitar uma busca
+        # demorada em bibliotecas grandes e para não escolher uma cópia antiga.
         try:
-            return discover_excel_file(
+            sibling_files = {
+                child.name.casefold(): child
+                for child in self.file_path.parent.iterdir()
+                if child.is_file() and not child.name.startswith("~$")
+            }
+        except (OSError, PermissionError):
+            sibling_files = {}
+        for candidate_name in unique_names:
+            sibling = sibling_files.get(candidate_name.casefold())
+            if sibling and sibling.suffix.casefold() in {".xlsx", ".xlsm"}:
+                resolved = sibling.resolve()
+                self._reference_paths[kind] = resolved
+                log.info("Planilha de %s localizada ao lado da base principal: %s", label, resolved)
+                return resolved
+
+        try:
+            resolved = discover_excel_file(
                 filename,
                 base_dir=self.base_dir,
                 fallback_filenames=unique_names[1:],
                 include_automatic_roots=True,
             )
+            self._reference_paths[kind] = resolved
+            return resolved
         except RepositoryError as exc:
             accepted_names = ", ".join(unique_names)
             raise RepositoryError(
@@ -1785,129 +1833,107 @@ class LocalExcelRepository:
             except OSError as exc:
                 raise RepositoryError(f"Não foi possível incluir no Excel: {exc}") from exc
 
-    def export_activities(self) -> tuple[str, bytes]:
-        """Export the activity sheet with its formatting and without DRAFT."""
+    def export_activities(self, activities: list[dict[str, Any]] | None = None) -> tuple[str, bytes]:
+        """Export a stable, formatted summary independent of the source workbook layout."""
         with self._lock:
             openpyxl = self._openpyxl()
-            try:
-                workbook = self._load_workbook(
-                    openpyxl,
-                    data_only=False,
-                    keep_vba=self.file_path.suffix.casefold() == ".xlsm",
+            from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+            from openpyxl.utils import get_column_letter
+            from openpyxl.worksheet.table import Table, TableStyleInfo
+
+            rows = self.list_activities() if activities is None else activities
+            exported = openpyxl.Workbook()
+            target = exported.active
+            target.title = "Atividades"
+            target.sheet_view.showGridLines = False
+            target.freeze_panes = "A2"
+            target.sheet_properties.tabColor = "7A2F73"
+
+            target.append([column[0] for column in EXPORT_COLUMNS])
+            for activity in rows:
+                exported_row: list[Any] = []
+                for _label, field, field_type in EXPORT_COLUMNS:
+                    value = activity.get(field, "")
+                    if field_type == "date":
+                        value = activity_date(value)
+                    elif field_type == "currency":
+                        value = round(to_number(value), 2)
+                    elif field_type == "integer":
+                        value = int(round(to_number(value)))
+                    elif value is None:
+                        value = ""
+                    else:
+                        value = str(value)
+                    exported_row.append(value)
+                target.append(exported_row)
+
+            header_fill = PatternFill("solid", fgColor="7A2F73")
+            header_font = Font(name="Aptos", size=10, bold=True, color="FFFFFF")
+            body_font = Font(name="Aptos", size=10, color="111827")
+            white_separator = Side(style="thin", color="FFFFFF")
+            subtle_border = Side(style="thin", color="E5E7EB")
+            for cell in target[1]:
+                cell.fill = header_fill
+                cell.font = header_font
+                cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                cell.border = Border(right=white_separator)
+            target.row_dimensions[1].height = 30
+
+            currency_columns = {
+                index for index, column in enumerate(EXPORT_COLUMNS, start=1) if column[2] == "currency"
+            }
+            integer_columns = {
+                index for index, column in enumerate(EXPORT_COLUMNS, start=1) if column[2] == "integer"
+            }
+            date_columns = {
+                index for index, column in enumerate(EXPORT_COLUMNS, start=1) if column[2] == "date"
+            }
+            numeric_columns = currency_columns | integer_columns
+            for row in target.iter_rows(min_row=2, max_row=target.max_row):
+                target.row_dimensions[row[0].row].height = 22
+                for cell in row:
+                    cell.font = body_font
+                    cell.alignment = Alignment(
+                        horizontal="right" if cell.column in numeric_columns else "left",
+                        vertical="center",
+                    )
+                    cell.border = Border(bottom=subtle_border)
+                    if cell.column in currency_columns:
+                        cell.number_format = '"R$" #,##0.00'
+                    elif cell.column in integer_columns:
+                        cell.number_format = "#,##0"
+                    elif cell.column in date_columns:
+                        cell.number_format = "dd/mm/yyyy"
+
+            widths = (16, 12, 24, 18, 38, 18, 24, 16, 16, 28, 16, 16, 16, 16, 14, 12, 16, 20)
+            for column_index, width in enumerate(widths, start=1):
+                target.column_dimensions[get_column_letter(column_index)].width = width
+
+            last_column = get_column_letter(len(EXPORT_COLUMNS))
+            if rows:
+                table = Table(displayName="AtividadesExportadas", ref=f"A1:{last_column}{target.max_row}")
+                table.tableStyleInfo = TableStyleInfo(
+                    name="TableStyleMedium4",
+                    showFirstColumn=False,
+                    showLastColumn=False,
+                    showRowStripes=True,
+                    showColumnStripes=False,
                 )
-            except (OSError, ValueError) as exc:
-                raise RepositoryError(f"Não foi possível abrir a base para exportação: {exc}") from exc
+                target.add_table(table)
+            else:
+                target.auto_filter.ref = f"A1:{last_column}1"
 
-            try:
-                if self.sheet_name not in workbook.sheetnames:
-                    raise RepositoryError(f"Aba '{self.sheet_name}' não encontrada.")
-                source = workbook[self.sheet_name]
-                field_columns = resolve_field_columns(cell.value for cell in source[1])
-                excluded_column = field_columns.get("draft")
-                excluded_column = excluded_column + 1 if excluded_column is not None else None
+            target.sheet_properties.pageSetUpPr.fitToPage = True
+            target.page_setup.orientation = "landscape"
+            target.page_setup.fitToWidth = 1
+            target.page_setup.fitToHeight = 0
+            target.print_title_rows = "1:1"
 
-                exported = openpyxl.Workbook()
-                target = exported.active
-                target.title = source.title[:31]
-                target.sheet_view.showGridLines = source.sheet_view.showGridLines
-                target.sheet_format.defaultRowHeight = source.sheet_format.defaultRowHeight
-                if source.sheet_properties.tabColor:
-                    target.sheet_properties.tabColor = copy(source.sheet_properties.tabColor)
-
-                column_map: dict[int, int] = {}
-                target_column = 0
-                for source_column in range(1, source.max_column + 1):
-                    if source_column == excluded_column:
-                        continue
-                    target_column += 1
-                    column_map[source_column] = target_column
-                    for row_number in range(1, source.max_row + 1):
-                        source_cell = source.cell(row_number, source_column)
-                        target_cell = target.cell(row_number, target_column, source_cell.value)
-                        if source_cell.has_style:
-                            target_cell.font = copy(source_cell.font)
-                            target_cell.fill = copy(source_cell.fill)
-                            target_cell.border = copy(source_cell.border)
-                            target_cell.alignment = copy(source_cell.alignment)
-                            target_cell.protection = copy(source_cell.protection)
-                            target_cell.number_format = source_cell.number_format
-                        if source_cell.hyperlink:
-                            target_cell._hyperlink = copy(source_cell.hyperlink)
-
-                for row_number, source_dimension in source.row_dimensions.items():
-                    target_dimension = target.row_dimensions[row_number]
-                    target_dimension.height = source_dimension.height
-                    target_dimension.hidden = source_dimension.hidden
-                    target_dimension.outlineLevel = source_dimension.outlineLevel
-
-                from openpyxl.utils import column_index_from_string, get_column_letter, range_boundaries
-                from openpyxl.utils.cell import coordinate_from_string
-                from openpyxl.worksheet.table import Table
-
-                for source_column, target_column in column_map.items():
-                    source_dimension = source.column_dimensions[get_column_letter(source_column)]
-                    target_dimension = target.column_dimensions[get_column_letter(target_column)]
-                    target_dimension.width = source_dimension.width
-                    target_dimension.hidden = source_dimension.hidden
-                    target_dimension.bestFit = source_dimension.bestFit
-                    target_dimension.outlineLevel = source_dimension.outlineLevel
-
-                for merged_range in source.merged_cells.ranges:
-                    min_col, min_row, max_col, max_row = range_boundaries(str(merged_range))
-                    if excluded_column and min_col <= excluded_column <= max_col:
-                        continue
-                    target.merge_cells(
-                        start_row=min_row,
-                        start_column=column_map[min_col],
-                        end_row=max_row,
-                        end_column=column_map[max_col],
-                    )
-
-                if source.freeze_panes:
-                    coordinate = getattr(source.freeze_panes, "coordinate", str(source.freeze_panes))
-                    column_letter, row_number = coordinate_from_string(coordinate)
-                    source_column = column_index_from_string(column_letter)
-                    if source_column in column_map:
-                        target.freeze_panes = f"{get_column_letter(column_map[source_column])}{row_number}"
-
-                for source_table in source.tables.values():
-                    min_col, min_row, max_col, max_row = range_boundaries(source_table.ref)
-                    if excluded_column and min_col <= excluded_column < max_col:
-                        continue
-                    if excluded_column == max_col:
-                        max_col -= 1
-                    if min_col not in column_map or max_col not in column_map:
-                        continue
-                    table = Table(
-                        displayName=source_table.displayName,
-                        ref=(
-                            f"{get_column_letter(column_map[min_col])}{min_row}:"
-                            f"{get_column_letter(column_map[max_col])}{max_row}"
-                        ),
-                    )
-                    table.tableStyleInfo = copy(source_table.tableStyleInfo)
-                    target.add_table(table)
-
-                if source.auto_filter.ref:
-                    min_col, min_row, max_col, max_row = range_boundaries(source.auto_filter.ref)
-                    if excluded_column == max_col:
-                        max_col -= 1
-                    if min_col in column_map and max_col in column_map:
-                        target.auto_filter.ref = (
-                            f"{get_column_letter(column_map[min_col])}{min_row}:"
-                            f"{get_column_letter(column_map[max_col])}{max_row}"
-                        )
-
-                if getattr(exported, "calculation", None) is not None:
-                    exported.calculation.fullCalcOnLoad = True
-                    exported.calculation.forceFullCalc = True
-                content = io.BytesIO()
-                exported.save(content)
-                exported.close()
-                filename = f"ATIVIDADES_{datetime.now():%Y%m%d_%H%M}.xlsx"
-                return filename, content.getvalue()
-            finally:
-                workbook.close()
+            content = io.BytesIO()
+            exported.save(content)
+            exported.close()
+            filename = f"ATIVIDADES_RESUMO_{datetime.now():%Y%m%d_%H%M}.xlsx"
+            return filename, content.getvalue()
 
     @staticmethod
     def _validate_service_calc_sheet(sheet) -> None:

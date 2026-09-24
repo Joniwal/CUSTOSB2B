@@ -469,9 +469,18 @@
     `).join("") || `<li><span>Nenhuma categoria disponível.</span></li>`;
   }
 
+  const currentLocalDate = new Date();
+  const currentDateValue = [
+    currentLocalDate.getFullYear(),
+    String(currentLocalDate.getMonth() + 1).padStart(2, "0"),
+    String(currentLocalDate.getDate()).padStart(2, "0"),
+  ].join("-");
+  const currentMonthValue = currentDateValue.slice(0, 7);
+
   const listState = {
     items: [], page: 1, pages: 1, perPage: 5, total: 0,
     q: "", status: "", type: "", technology: "", sort: "id", direction: "asc", selectedKey: null,
+    period: "all", month: currentMonthValue, start: `${currentMonthValue}-01`, end: currentDateValue,
     filtersLoaded: false, options: {}, calculationMode: "direct_costs", creationOpened: false,
   };
 
@@ -483,15 +492,52 @@
     listState.status = params.get("status") || "";
     listState.type = params.get("type") || "";
     listState.technology = params.get("technology") || "";
+    listState.period = ["all", "month", "custom"].includes(params.get("period")) ? params.get("period") : "all";
+    listState.month = params.get("month") || listState.month;
+    listState.start = params.get("start") || listState.start;
+    listState.end = params.get("end") || listState.end;
     document.querySelector("#list-search").value = listState.q;
+    document.querySelector("#period-filter").value = listState.period;
+    document.querySelector("#month-filter").value = listState.month;
+    document.querySelector("#start-filter").value = listState.start;
+    document.querySelector("#end-filter").value = listState.end;
+  }
+
+  function syncListPeriodControls() {
+    const isMonth = listState.period === "month";
+    const isCustom = listState.period === "custom";
+    document.querySelector("#month-filter-field").hidden = !isMonth;
+    document.querySelector("#start-filter-field").hidden = !isCustom;
+    document.querySelector("#end-filter-field").hidden = !isCustom;
+    document.querySelector("#month-filter").disabled = !isMonth;
+    document.querySelector("#start-filter").disabled = !isCustom;
+    document.querySelector("#end-filter").disabled = !isCustom;
+  }
+
+  function listFilterParams() {
+    return new URLSearchParams({
+      q: listState.q,
+      status: listState.status,
+      type: listState.type,
+      technology: listState.technology,
+      period: listState.period,
+      month: listState.month,
+      start: listState.start,
+      end: listState.end,
+    });
+  }
+
+  function syncExportHref() {
+    document.querySelector("#export-button").href = `/api/activities/export?${listFilterParams()}`;
   }
 
   async function loadActivities({ announce = false } = {}) {
-    const params = new URLSearchParams({
-      q: listState.q, status: listState.status, type: listState.type, technology: listState.technology,
-      sort: listState.sort, direction: listState.direction,
-      page: String(listState.page), per_page: String(listState.perPage),
-    });
+    const params = listFilterParams();
+    params.set("sort", listState.sort);
+    params.set("direction", listState.direction);
+    params.set("page", String(listState.page));
+    params.set("per_page", String(listState.perPage));
+    syncExportHref();
     try {
       const data = await getJson(`/api/activities?${params}`);
       setConnection(true, data.source);
@@ -617,12 +663,31 @@
     document.querySelector("#technology-filter").addEventListener("change", (event) => {
       listState.technology = event.target.value; listState.page = 1; loadActivities();
     });
+    document.querySelector("#period-filter").addEventListener("change", (event) => {
+      listState.period = event.target.value;
+      listState.page = 1;
+      syncListPeriodControls();
+      loadActivities();
+    });
+    document.querySelector("#month-filter").addEventListener("change", (event) => {
+      listState.month = event.target.value || currentMonthValue; listState.page = 1; loadActivities();
+    });
+    document.querySelector("#start-filter").addEventListener("change", (event) => {
+      listState.start = event.target.value; listState.page = 1;
+      if (listState.start && listState.end) loadActivities(); else syncExportHref();
+    });
+    document.querySelector("#end-filter").addEventListener("change", (event) => {
+      listState.end = event.target.value; listState.page = 1;
+      if (listState.start && listState.end) loadActivities(); else syncExportHref();
+    });
     document.querySelector("#clear-filters").addEventListener("click", () => {
-      listState.q = ""; listState.status = ""; listState.type = ""; listState.technology = ""; listState.page = 1;
+      listState.q = ""; listState.status = ""; listState.type = ""; listState.technology = ""; listState.period = "all"; listState.page = 1;
       search.value = "";
       document.querySelector("#status-filter").value = "";
       document.querySelector("#type-filter").value = "";
       document.querySelector("#technology-filter").value = "";
+      document.querySelector("#period-filter").value = "all";
+      syncListPeriodControls();
       history.replaceState(null, "", "/atividades");
       loadActivities({ announce: true });
     });
@@ -639,6 +704,8 @@
       loadActivities();
     }));
     document.querySelector("#edit-selected").addEventListener("click", () => openEdit(listState.selectedKey));
+    syncListPeriodControls();
+    syncExportHref();
   }
 
   let editingActivity = null;

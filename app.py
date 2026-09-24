@@ -120,6 +120,67 @@ def _period_items(activities: list[dict], start: date, end: date) -> list[dict]:
     return result
 
 
+def filter_activities(activities: list[dict], query: dict[str, list[str]]) -> list[dict]:
+    """Apply the list/export filters consistently, including month or date range."""
+    text = query.get("q", [""])[0].strip().casefold()
+    status = query.get("status", [""])[0].strip().casefold()
+    activity_type = query.get("type", [""])[0].strip().casefold()
+    technology = query.get("technology", [""])[0].strip().casefold()
+    period_mode = query.get("period", ["all"])[0].strip().casefold() or "all"
+
+    if text:
+        activities = [
+            item
+            for item in activities
+            if text in " ".join(
+                str(item.get(key, ""))
+                for key in (
+                    "id", "tipo_atividade", "status", "situacao", "material_utilizado", "cod_material",
+                    "empresa", "tecnico_nome", "matricula", "eps", "tecnologia", "draft",
+                )
+            ).casefold()
+        ]
+    if status:
+        requested = "".join(char for char in status if char.isalnum()).casefold()
+        if requested.startswith("conclu"):
+            activities = [item for item in activities if "conclu" in str(item.get("status", "")).casefold()]
+        elif requested.startswith("cancela") or requested.startswith("inativ"):
+            activities = [
+                item for item in activities
+                if any(token in str(item.get("status", "")).casefold() for token in ("cancel", "inativ"))
+            ]
+        else:
+            activities = [item for item in activities if str(item.get("status", "")).casefold() == status]
+    if activity_type:
+        activities = [item for item in activities if str(item.get("tipo_atividade", "")).casefold() == activity_type]
+    if technology:
+        activities = [item for item in activities if str(item.get("tecnologia", "")).casefold() == technology]
+
+    if period_mode == "month":
+        month_text = query.get("month", [date.today().strftime("%Y-%m")])[0]
+        try:
+            selected_month = datetime.strptime(month_text, "%Y-%m").date()
+        except ValueError as exc:
+            raise ValueError("Mês de referência inválido.") from exc
+        start = selected_month.replace(day=1)
+        end = selected_month.replace(day=monthrange(selected_month.year, selected_month.month)[1])
+        activities = _period_items(activities, start, end)
+    elif period_mode == "custom":
+        start_text = query.get("start", [""])[0]
+        end_text = query.get("end", [""])[0]
+        if not start_text or not end_text:
+            raise ValueError("Informe a data inicial e a data final.")
+        start = _parse_iso_date(start_text, "Data inicial")
+        end = _parse_iso_date(end_text, "Data final")
+        if start > end:
+            raise ValueError("A data inicial não pode ser posterior à data final.")
+        activities = _period_items(activities, start, end)
+    elif period_mode != "all":
+        raise ValueError("Filtro de período inválido.")
+
+    return activities
+
+
 def _kpi_comparison(current: dict, previous: dict) -> list[dict]:
     definitions = (
         ("custo_mo", "Custo Serviços"),
@@ -299,7 +360,7 @@ class RequestHandler(BaseHTTPRequestHandler):
             self._dashboard(parse_qs(parsed.query))
             return
         if path == "/api/activities/export":
-            self._export_activities()
+            self._export_activities(parse_qs(parsed.query))
             return
         if path == "/api/activities":
             self._activities(parse_qs(parsed.query))
@@ -519,39 +580,7 @@ class RequestHandler(BaseHTTPRequestHandler):
 
     def _activities(self, query: dict[str, list[str]]) -> None:
         try:
-            activities = self.server.repository.list_activities()
-            text = query.get("q", [""])[0].strip().casefold()
-            status = query.get("status", [""])[0].strip().casefold()
-            activity_type = query.get("type", [""])[0].strip().casefold()
-            technology = query.get("technology", [""])[0].strip().casefold()
-
-            if text:
-                activities = [
-                    item
-                    for item in activities
-                    if text in " ".join(
-                        str(item.get(key, ""))
-                        for key in (
-                            "id", "tipo_atividade", "status", "situacao", "material_utilizado", "cod_material",
-                            "empresa", "tecnico_nome", "matricula", "eps", "tecnologia", "draft",
-                        )
-                    ).casefold()
-                ]
-            if status:
-                requested = "".join(char for char in status if char.isalnum()).casefold()
-                if requested.startswith("conclu"):
-                    activities = [item for item in activities if "conclu" in str(item.get("status", "")).casefold()]
-                elif requested.startswith("cancela") or requested.startswith("inativ"):
-                    activities = [
-                        item for item in activities
-                        if any(token in str(item.get("status", "")).casefold() for token in ("cancel", "inativ"))
-                    ]
-                else:
-                    activities = [item for item in activities if str(item.get("status", "")).casefold() == status]
-            if activity_type:
-                activities = [item for item in activities if str(item.get("tipo_atividade", "")).casefold() == activity_type]
-            if technology:
-                activities = [item for item in activities if str(item.get("tecnologia", "")).casefold() == technology]
+            activities = filter_activities(self.server.repository.list_activities(), query)
 
             allowed_sorts = {
                 "id", "tipo_atividade", "status", "situacao", "tecnologia", "draft",
@@ -595,9 +624,10 @@ class RequestHandler(BaseHTTPRequestHandler):
         except (RepositoryError, ValueError) as exc:
             self._error(str(exc), HTTPStatus.SERVICE_UNAVAILABLE)
 
-    def _export_activities(self) -> None:
+    def _export_activities(self, query: dict[str, list[str]]) -> None:
         try:
-            filename, content = self.server.repository.export_activities()
+            activities = filter_activities(self.server.repository.list_activities(), query)
+            filename, content = self.server.repository.export_activities(activities)
             self._attachment(
                 content,
                 filename,
