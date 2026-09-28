@@ -678,6 +678,44 @@ class CalculationTests(unittest.TestCase):
             self.assertEqual(located_services, services_path.resolve())
             self.assertEqual(located_materials, materials_path.resolve())
 
+    def test_reference_workbooks_are_found_in_nearby_sharepoint_folders(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            shared_library = temp_root / "Empresa - Documentos compartilhados"
+            activity_folder = shared_library / "Bases" / "Atividades"
+            catalog_folder = shared_library / "Bases" / "Catalogos"
+            activity_folder.mkdir(parents=True)
+            catalog_folder.mkdir(parents=True)
+            main_path = activity_folder / "B2B_CTACUSTOS.xlsx"
+            services_path = catalog_folder / "SERVICOS.xlsx"
+            materials_path = catalog_folder / "MATERIAL.xlsx"
+            create_test_activity_workbook(main_path)
+            services_path.write_bytes(b"services")
+            materials_path.write_bytes(b"materials")
+
+            with patch.dict(
+                os.environ,
+                {
+                    "EXCEL_PATH": str(main_path),
+                    "EXCEL_SEARCH_ROOTS": str(temp_root / "pasta-inexistente"),
+                    "EXCEL_SHEET_NAME": "Atividades",
+                    "EXCEL_FALLBACK_SAMPLE": "false",
+                    "SERVICES_EXCEL_PATH": "",
+                    "SERVICES_EXCEL_FILENAME": "SERVICOS.xlsx",
+                    "SERVICES_EXCEL_FILENAME_ALIASES": "",
+                    "MATERIALS_EXCEL_PATH": "",
+                    "MATERIALS_EXCEL_FILENAME": "MATERIAIS.xlsx",
+                    "MATERIALS_EXCEL_FILENAME_ALIASES": "MATERIAL.xlsx",
+                },
+                clear=False,
+            ):
+                repository = LocalExcelRepository(temp_root)
+                located_services = repository._locate_reference_workbook("services")
+                located_materials = repository._locate_reference_workbook("materials")
+
+            self.assertEqual(located_services, services_path.resolve())
+            self.assertEqual(located_materials, materials_path.resolve())
+
     def test_missing_services_does_not_block_material_catalog(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_root = Path(temp_dir)

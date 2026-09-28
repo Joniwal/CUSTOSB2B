@@ -729,6 +729,7 @@ def discover_excel_file(
     base_dir: Path,
     fallback_filenames: Iterable[str] = (),
     include_automatic_roots: bool = False,
+    preferred_roots: Iterable[Path] = (),
 ) -> Path:
     """Find one workbook by prioritized names in synchronized OneDrive folders."""
     filenames: list[str] = []
@@ -753,34 +754,58 @@ def discover_excel_file(
     if not filenames:
         raise RepositoryError("EXCEL_FILENAME deve informar um arquivo .xlsx ou .xlsm.")
 
+    ignored_directories = {".git", ".pytest_cache", "__pycache__", "node_modules", "backups", "_backups"}
+
+    def matches_in_roots(roots_to_scan: Iterable[Path]) -> dict[str, dict[str, Path]]:
+        found: dict[str, dict[str, Path]] = {name.casefold(): {} for name in filenames}
+        target_names = set(found)
+        for root in roots_to_scan:
+            try:
+                for current, directories, files in os.walk(root, topdown=True, followlinks=False):
+                    directories[:] = [
+                        directory for directory in directories
+                        if directory.casefold() not in ignored_directories
+                    ]
+                    for actual_name in files:
+                        normalized_actual_name = actual_name.casefold()
+                        if actual_name.startswith("~$") or normalized_actual_name not in target_names:
+                            continue
+                        candidate = Path(current) / actual_name
+                        try:
+                            resolved = candidate.resolve()
+                            if resolved.is_file():
+                                found[normalized_actual_name][os.path.normcase(str(resolved))] = resolved
+                        except OSError:
+                            continue
+            except (OSError, PermissionError):
+                log.warning("Não foi possível percorrer a pasta sincronizada: %s", root)
+        return found
+
+    # Reference workbooks normally live in the same SharePoint library as the
+    # main workbook. Search these smaller, known folders first so a large
+    # corporate OneDrive does not make the calculator request time out.
+    for preferred_root in _deduplicate_existing_directories(preferred_roots):
+        preferred_matches = matches_in_roots([preferred_root])
+        for candidate_name in filenames:
+            ordered = sorted(
+                preferred_matches[candidate_name.casefold()].values(),
+                key=lambda path: str(path).casefold(),
+            )
+            if len(ordered) == 1:
+                log.info("Excel localizado próximo à base principal: %s", ordered[0])
+                return ordered[0]
+            if len(ordered) > 1:
+                locations = "\n".join(f"- {path}" for path in ordered[:10])
+                raise RepositoryError(
+                    f"Foram encontradas {len(ordered)} cópias de '{candidate_name}' próximas à base principal. "
+                    f"Configure o caminho correto no .env:\n{locations}"
+                )
+
     roots = _onedrive_search_roots(
         base_dir,
         include_automatic_when_configured=include_automatic_roots,
     )
-    target_names = {name.casefold() for name in filenames}
-    matches: dict[str, dict[str, Path]] = {name.casefold(): {} for name in filenames}
-    ignored_directories = {".git", ".pytest_cache", "__pycache__", "node_modules", "backups", "_backups"}
-
-    for root in roots:
-        try:
-            for current, directories, files in os.walk(root, topdown=True, followlinks=False):
-                directories[:] = [
-                    directory for directory in directories
-                    if directory.casefold() not in ignored_directories
-                ]
-                for actual_name in files:
-                    normalized_actual_name = actual_name.casefold()
-                    if actual_name.startswith("~$") or normalized_actual_name not in target_names:
-                        continue
-                    candidate = Path(current) / actual_name
-                    try:
-                        resolved = candidate.resolve()
-                        if resolved.is_file():
-                            matches[normalized_actual_name][os.path.normcase(str(resolved))] = resolved
-                    except OSError:
-                        continue
-        except (OSError, PermissionError):
-            log.warning("Não foi possível percorrer a pasta sincronizada: %s", root)
+    matches = matches_in_roots(roots)
 
     for candidate_name in filenames:
         ordered = sorted(matches[candidate_name.casefold()].values(), key=lambda path: str(path).casefold())
@@ -952,12 +977,25 @@ class LocalExcelRepository:
                 log.info("Planilha de %s localizada ao lado da base principal: %s", label, resolved)
                 return resolved
 
+        nearby_roots: list[Path] = []
+        home = Path.home().resolve()
+        current = self.file_path.parent.resolve()
+        for _level in range(4):
+            if current == home or current.parent == current:
+                break
+            nearby_roots.append(current)
+            parent = current.parent
+            if parent == home:
+                break
+            current = parent
+
         try:
             resolved = discover_excel_file(
                 filename,
                 base_dir=self.base_dir,
                 fallback_filenames=unique_names[1:],
                 include_automatic_roots=True,
+                preferred_roots=nearby_roots,
             )
             self._reference_paths[kind] = resolved
             return resolved
