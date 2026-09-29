@@ -1189,7 +1189,7 @@
     setCalculatorTab("materials", false);
 
     try {
-      const data = await getJson(`/api/service-calculation?activity=${encodeURIComponent(reference)}`, { timeoutMs: 45000 });
+      const data = await getJson(`/api/service-calculation?activity=${encodeURIComponent(reference)}`, { timeoutMs: 120000 });
       serviceCalculatorState.activity = data.activity;
       serviceCalculatorState.materials = data.materials || [];
       serviceCalculatorState.selectedMaterials = (data.selected_materials || []).map((item) => ({

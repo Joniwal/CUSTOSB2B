@@ -76,6 +76,8 @@ A busca também aceita `MATERIAL.xlsx`, `SERVIÇOS.xlsx` e as mesmas variantes e
 
 Para validar uma nova máquina, abra a biblioteca compartilhada no Explorador de Arquivos e confirme que as três planilhas aparecem localmente. Se estiverem somente na seção “Compartilhado” do site, use **Sincronizar** ou **Adicionar atalho ao Meu OneDrive** no SharePoint e aguarde o cliente do OneDrive concluir. Marque os arquivos como **Sempre manter neste dispositivo**. Para um `.env` portátil, deixe `EXCEL_PATH=`, `SERVICES_EXCEL_PATH=` e `MATERIALS_EXCEL_PATH=` vazios. Se houver duas cópias com o mesmo nome, informe o caminho correto para eliminar a ambiguidade.
 
+No primeiro acesso à calculadora, Materiais e Serviços são procurados e abertos em paralelo. Em bibliotecas corporativas grandes essa primeira leitura pode levar até dois minutos; os caminhos encontrados ficam em cache durante a execução. Permissão de compartilhamento no site não substitui a sincronização local: sem Microsoft Graph, a aplicação precisa que cada arquivo esteja visível e disponível no Explorador de Arquivos do computador.
+
 É possível restringir a procura a várias raízes em `EXCEL_SEARCH_ROOTS`, separadas por `;` no Windows. Se houver mais de uma cópia com o mesmo nome, o aplicativo interrompe a inicialização e mostra os caminhos encontrados, evitando gravar silenciosamente no arquivo errado.
 
 ### Caminho manual

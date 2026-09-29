@@ -8,6 +8,7 @@ import re
 import threading
 import unicodedata
 from calendar import monthrange
+from concurrent.futures import ThreadPoolExecutor
 from copy import copy
 from collections import Counter
 from datetime import date, datetime
@@ -2049,18 +2050,24 @@ class LocalExcelRepository:
 
     def get_service_calculation(self, activity_reference: str) -> dict[str, Any]:
         services_error = ""
-        try:
-            catalog = self.list_services()
-        except RepositoryError as exc:
-            catalog = {"items": [], "source": "SERVICOS.xlsx"}
-            services_error = str(exc)
-        catalog_by_key = {item["key"]: item for item in catalog["items"]}
         materials_error = ""
-        try:
-            material_catalog = self.list_materials()
-        except RepositoryError as exc:
-            material_catalog = {"items": [], "source": "MATERIAIS.xlsx"}
-            materials_error = str(exc)
+        # These workbooks may live in different SharePoint libraries. Loading
+        # them concurrently avoids making the first calculator request wait for
+        # two potentially large synchronized-folder searches in sequence.
+        with ThreadPoolExecutor(max_workers=2, thread_name_prefix="catalog") as executor:
+            services_future = executor.submit(self.list_services)
+            materials_future = executor.submit(self.list_materials)
+            try:
+                catalog = services_future.result()
+            except RepositoryError as exc:
+                catalog = {"items": [], "source": "SERVICOS.xlsx"}
+                services_error = str(exc)
+            try:
+                material_catalog = materials_future.result()
+            except RepositoryError as exc:
+                material_catalog = {"items": [], "source": "MATERIAIS.xlsx"}
+                materials_error = str(exc)
+        catalog_by_key = {item["key"]: item for item in catalog["items"]}
         materials_by_key = {item["key"]: item for item in material_catalog["items"]}
         settings = self.get_settings()
         with self._lock:
