@@ -402,6 +402,24 @@ class RequestHandler(BaseHTTPRequestHandler):
             logging.exception("Falha ao atualizar atividade %s", activity_id)
             self._error("Não foi possível salvar a atividade. Verifique o arquivo e tente novamente.", HTTPStatus.INTERNAL_SERVER_ERROR)
 
+    def do_DELETE(self) -> None:  # noqa: N802
+        parsed = urlparse(self.path)
+        prefix = "/api/activities/"
+        if not parsed.path.startswith(prefix):
+            self.send_error(HTTPStatus.NOT_FOUND)
+            return
+        activity_reference = unquote(parsed.path[len(prefix) :]).strip()
+        if not activity_reference:
+            self._error("Atividade não informada.")
+            return
+        try:
+            deleted = self.server.repository.delete_activity(activity_reference)
+            self._json({"ok": True, "activity": deleted})
+        except ValueError as exc:
+            self._error(str(exc))
+        except RepositoryError as exc:
+            self._error(str(exc), HTTPStatus.CONFLICT)
+
     def do_POST(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
         path = parsed.path.rstrip("/")
@@ -584,12 +602,12 @@ class RequestHandler(BaseHTTPRequestHandler):
 
             allowed_sorts = {
                 "id", "tipo_atividade", "status", "situacao", "tecnologia", "draft",
-                "atualizado_em", "custo_total", "gap",
+                "data", "atualizado_em", "custo_total", "gap",
             }
-            sort_key = query.get("sort", ["id"])[0]
+            sort_key = query.get("sort", ["data"])[0]
             if sort_key not in allowed_sorts:
-                sort_key = "id"
-            reverse = query.get("direction", ["asc"])[0] == "desc"
+                sort_key = "data"
+            reverse = query.get("direction", ["desc"])[0] == "desc"
 
             def sortable(item):
                 value = item.get(sort_key)
@@ -597,7 +615,13 @@ class RequestHandler(BaseHTTPRequestHandler):
                     return (0, value)
                 return (1, str(value or "").casefold())
 
-            activities.sort(key=sortable, reverse=reverse)
+            if sort_key == "data":
+                without_date = [item for item in activities if activity_date(item.get("data")) is None]
+                with_date = [item for item in activities if activity_date(item.get("data")) is not None]
+                with_date.sort(key=lambda item: activity_date(item.get("data")), reverse=reverse)
+                activities = [*without_date, *with_date]
+            else:
+                activities.sort(key=sortable, reverse=reverse)
             total = len(activities)
             def safe_int(value: str, default: int) -> int:
                 try:

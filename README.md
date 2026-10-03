@@ -1,6 +1,6 @@
 # B2B CTACUSTOS
 
-Aplicação local e responsiva para consultar e editar atividades armazenadas em Excel. Inclui dashboard, lista detalhada, filtros, ordenação, paginação, modal de edição, cálculos financeiros, descoberta automática de pastas OneDrive sincronizadas e configuração para gerar executável Windows. Não utiliza Microsoft Graph, Azure AD nem API de nuvem.
+Aplicação local e responsiva para consultar, incluir, editar e excluir atividades armazenadas em Excel. Inclui dashboard, lista detalhada, filtros, ordenação, paginação, modal de edição, cálculos financeiros, descoberta automática de pastas OneDrive sincronizadas e configuração para gerar executável Windows. Não utiliza Microsoft Graph, Azure AD nem API de nuvem.
 
 ## Recursos atuais
 
@@ -11,6 +11,9 @@ Aplicação local e responsiva para consultar e editar atividades armazenadas em
 - Gráficos por tipo de atividade, técnico e empresa, alternando quantidade, custo e GAP.
 - Tabelas de resumo por tipo de atividade e tecnologia, com totais de Serviços e GAP do período filtrado.
 - Filtros por mês ou intervalo de datas na página Atividades, aplicados também à exportação.
+- Lista de atividades ordenada inicialmente com datas vazias no topo e, em seguida, da data mais recente para a mais antiga; a coluna Data fica visível ao lado de DRAFT.
+- Inclusão e edição usam Categoria e uma lista controlada de Situação. Reparo e Ativação associam automaticamente a tecnologia de mesmo nome e seu valor configurado ao Custo Serviço, Custo Total e GAP.
+- Exclusão por linha remove a atividade e seus itens vinculados das calculadoras, mantendo a tabela e as fórmulas da planilha ajustadas.
 - Exportar Excel em uma versão resumida, com colunas fixas e formatação profissional, incluindo DRAFT.
 - Campo DRAFT ao final da listagem e nos formulários de inclusão e edição.
 - Inclusão e edição pelo mesmo formulário, com opções de status, empresa, EPS e técnico administradas no próprio aplicativo.

@@ -8,7 +8,7 @@
   <title>Atividades · B2B CTACUSTOS</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="alternate icon" href="/favicon.ico">
-  <link rel="stylesheet" href="/static/app.css?v=20260924-1">
+  <link rel="stylesheet" href="/static/app.css?v=20261003-1">
 </head>
 <body data-page="activities">
   <a class="skip-link" href="#conteudo">Ir para o conteúdo principal</a>
@@ -146,16 +146,17 @@
             <thead>
               <tr>
                 <th scope="col" class="calculator-column"><span class="sr-only">Calculadora de custos</span></th>
-                <th scope="col" aria-sort="ascending"><button class="sort-button" type="button" data-sort="id">ID <span aria-hidden="true">↕</span></button></th>
-                <th scope="col" aria-sort="none"><button class="sort-button" type="button" data-sort="tipo_atividade">Tipo de Atividade <span aria-hidden="true">↕</span></button></th>
+                <th scope="col" aria-sort="none"><button class="sort-button" type="button" data-sort="id">ID <span aria-hidden="true">↕</span></button></th>
+                <th scope="col" aria-sort="none"><button class="sort-button" type="button" data-sort="tipo_atividade">Categoria <span aria-hidden="true">↕</span></button></th>
                 <th scope="col" aria-sort="none"><button class="sort-button" type="button" data-sort="status">Status <span aria-hidden="true">↕</span></button></th>
                 <th scope="col" aria-sort="none"><button class="sort-button" type="button" data-sort="situacao">Situação <span aria-hidden="true">↕</span></button></th>
                 <th scope="col" class="actions-column">Ações</th>
                 <th scope="col" aria-sort="none"><button class="sort-button" type="button" data-sort="draft">DRAFT <span aria-hidden="true">↕</span></button></th>
+                <th scope="col" aria-sort="descending"><button class="sort-button" type="button" data-sort="data">Data <span aria-hidden="true">↕</span></button></th>
               </tr>
             </thead>
             <tbody id="activities-body">
-              <tr><td colspan="7"><div class="empty-state"><div class="spinner" aria-hidden="true"></div><p>Carregando atividades…</p></div></td></tr>
+              <tr><td colspan="8"><div class="empty-state"><div class="spinner" aria-hidden="true"></div><p>Carregando atividades…</p></div></td></tr>
             </tbody>
           </table>
         </div>
@@ -184,9 +185,9 @@
           <div class="form-grid form-grid--four">
             <label class="input-group" id="activity-id-field"><span>ID <small>(opcional na inclusão)</small></span><input name="id" maxlength="60" placeholder="Gerado automaticamente"></label>
             <label class="input-group"><span>Data</span><input name="data" type="date" required></label>
-            <label class="input-group"><span>Tipo de atividade</span><input name="tipo_atividade" list="type-options" required maxlength="120"><datalist id="type-options"></datalist></label>
+            <label class="input-group"><span>Categoria</span><input name="tipo_atividade" id="form-category" list="type-options" required maxlength="120"><datalist id="type-options"></datalist></label>
             <label class="input-group"><span>Status</span><select name="status" id="form-status" required><option value="">Selecione</option></select></label>
-            <label class="input-group input-group--wide"><span>Situação / detalhes</span><input name="situacao" required maxlength="180"></label>
+            <label class="input-group input-group--wide"><span>Situação / detalhes</span><select name="situacao" id="form-situation" required><option value="">Selecione</option><option value="ATENDIMENTO CLIENTE FINAL">ATENDIMENTO CLIENTE FINAL</option><option value="CONCLUÍDO">CONCLUÍDO</option></select></label>
             <fieldset class="duplicate-id-control">
               <legend>Validação do ID</legend>
               <label><input type="radio" name="allow_duplicate_id" value="false" checked> Exigir ID único</label>
@@ -217,9 +218,9 @@
             <label class="input-group"><span>Custo Material</span><div class="money-input"><span>R$</span><input name="custo_mat" type="text" inputmode="decimal" data-currency-input autocomplete="off"></div></label>
             <label class="input-group"><span>Custo Total</span><output class="calculated-output" id="calc-total">R$ 0,00</output></label>
             <label class="input-group"><span>Custo Evitado</span><output class="calculated-output" id="calc-avoided">R$ 0,00</output><input name="custo_evitado" type="hidden" value="0"></label>
-            <label class="input-group"><span>GAP</span><output class="calculated-output calculated-output--gap is-neutral" id="calc-gap" aria-label="GAP calculado por categoria">Por categoria</output><small id="calc-gap-detail">Calculado no Dashboard com a equipe configurada.</small></label>
+            <label class="input-group"><span>GAP</span><output class="calculated-output calculated-output--gap is-neutral" id="calc-gap" aria-label="GAP da atividade">R$ 0,00</output><input name="gap" type="hidden" value="0"><small id="calc-gap-detail">Preenchido automaticamente para Reparo e Ativação.</small></label>
           </div>
-          <p class="formula-note"><strong>Regras:</strong> Custo Total = Custo Serviço + Custo Material. Custo Evitado = Custo Serviço. O GAP é consolidado por categoria no Dashboard, sem usar técnicos × dias neste formulário.</p>
+          <p class="formula-note"><strong>Regras:</strong> Custo Total = Custo Serviço + Custo Material. Custo Evitado = Custo Serviço. Em Reparo e Ativação, Categoria e Tecnologia usam o mesmo valor configurado e o GAP é preenchido sem técnicos × dias.</p>
         </div>
       </div>
       <footer class="modal__footer">
@@ -367,6 +368,6 @@
   </dialog>
 
   <div class="toast-region" id="toast-region" role="status" aria-live="polite"></div>
-  <script src="/static/app.js?v=20260929-1" defer></script>
+  <script src="/static/app.js?v=20261003-1" defer></script>
 </body>
 </html>

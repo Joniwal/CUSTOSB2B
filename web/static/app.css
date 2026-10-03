@@ -402,11 +402,15 @@ svg { display: block; }
 .cell-secondary { display: block; max-width: 420px; overflow: hidden; color: var(--color-text-muted); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .cell-situation { max-width: 450px; color: var(--color-text-soft); }
 .calculator-column, .calculator-cell { width: 64px; text-align: center !important; }
-.actions-column { width: 90px; text-align: center !important; }
+.actions-column { width: 104px; text-align: center !important; }
 .actions-cell { text-align: center; }
 #activities-table th:last-child, #activities-table td:last-child { min-width: 150px; }
-.edit-button { margin: 0 auto; color: var(--color-primary-strong); }
+.row-actions { display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
+.edit-button { color: var(--color-primary-strong); }
 .edit-button:hover { background: var(--color-primary-soft); }
+.delete-button { color: var(--color-error); }
+.delete-button:hover { background: var(--color-error-soft); }
+.cell-date { color: var(--color-text-soft); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .calculator-button { margin: 0 auto; border: 1px solid #E4B4DF; background: var(--color-primary-soft); color: var(--color-primary-strong); }
 .calculator-button:hover { border-color: var(--color-primary-strong); background: #F8DDF5; }
 .calculator-button svg { width: 18px; height: 18px; }
@@ -921,7 +925,8 @@ th[aria-sort="descending"] .sort-button span::after { content: "↓"; font-size:
   #activities-table tbody td:nth-child(4) { grid-column: 1; }
   #activities-table tbody td:nth-child(5) { grid-column: 1 / -1; }
   #activities-table tbody td:nth-child(6) { position: absolute; top: 10px; right: 9px; }
-  #activities-table tbody td:nth-child(7) { grid-column: 1 / -1; }
+  #activities-table tbody td:nth-child(7) { grid-column: 1; }
+  #activities-table tbody td:nth-child(8) { grid-column: 2; text-align: right; }
   #activities-table tbody td:nth-child(1)::before, #activities-table tbody td:nth-child(6)::before { display: none; }
   #activities-table tbody td[colspan] { position: static; width: 100%; grid-column: 1 / -1; text-align: center; }
   #activities-table .empty-state { min-height: 250px; }

@@ -21,6 +21,12 @@
     .replaceAll("'", "&#039;");
 
   const normalize = (value) => String(value ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  const formatActivityDate = (value) => {
+    const text = String(value || "").trim();
+    if (!text) return "—";
+    const parsed = new Date(`${text.slice(0, 10)}T12:00:00`);
+    return Number.isNaN(parsed.getTime()) ? text : parsed.toLocaleDateString("pt-BR");
+  };
   const parseLocaleNumber = (value) => {
     const text = String(value ?? "").replace("R$", "").replace(/\s/g, "").trim();
     if (!text) return 0;
@@ -479,7 +485,7 @@
 
   const listState = {
     items: [], page: 1, pages: 1, perPage: 5, total: 0,
-    q: "", status: "", type: "", technology: "", sort: "id", direction: "asc", selectedKey: null,
+    q: "", status: "", type: "", technology: "", sort: "data", direction: "desc", selectedKey: null,
     period: "all", month: currentMonthValue, start: `${currentMonthValue}-01`, end: currentDateValue,
     filtersLoaded: false, options: {}, calculationMode: "direct_costs", creationOpened: false,
   };
@@ -563,7 +569,7 @@
       }
     } catch (error) {
       setConnection(false);
-      document.querySelector("#activities-body").innerHTML = `<tr><td colspan="7"><div class="empty-state">${iconEmpty}<p>${escapeHtml(error.message)}</p></div></td></tr>`;
+      document.querySelector("#activities-body").innerHTML = `<tr><td colspan="8"><div class="empty-state">${iconEmpty}<p>${escapeHtml(error.message)}</p></div></td></tr>`;
       toast("Falha ao carregar atividades", error.message, true);
     }
   }
@@ -578,7 +584,7 @@
   function renderActivities() {
     const body = document.querySelector("#activities-body");
     if (!listState.items.length) {
-      body.innerHTML = `<tr><td colspan="7"><div class="empty-state">${iconEmpty}<p>Nenhuma atividade corresponde aos filtros.</p></div></td></tr>`;
+      body.innerHTML = `<tr><td colspan="8"><div class="empty-state">${iconEmpty}<p>Nenhuma atividade corresponde aos filtros.</p></div></td></tr>`;
       return;
     }
     body.innerHTML = listState.items.map((item) => {
@@ -589,11 +595,12 @@
         <tr class="${selected ? "row--selected" : ""} ${disabled ? "row--disabled" : ""}" data-row-key="${escapeHtml(key)}" aria-selected="${selected}">
           <td data-label="Custos" class="calculator-cell"><button class="icon-button calculator-button" type="button" data-service-calculator="${escapeHtml(key)}" aria-label="Calcular materiais e serviços da atividade ${escapeHtml(item.id)}" title="Calcular materiais e serviços">${iconCalculator}</button></td>
           <td data-label="ID"><span class="cell-id">${escapeHtml(item.id)}</span></td>
-          <td data-label="Tipo de Atividade"><span class="cell-primary">${escapeHtml(item.tipo_atividade)}</span><small class="cell-secondary">${escapeHtml(item.material_utilizado || item.servico_mo || "Sem detalhe adicional")}</small></td>
+          <td data-label="Categoria"><span class="cell-primary">${escapeHtml(item.tipo_atividade)}</span><small class="cell-secondary">${escapeHtml(item.material_utilizado || item.servico_mo || "Sem detalhe adicional")}</small></td>
           <td data-label="Status">${badge(item.status)}</td>
           <td data-label="Situação"><span class="cell-situation">${escapeHtml(item.situacao)}</span></td>
-          <td data-label="Ações" class="actions-cell"><button class="icon-button edit-button" type="button" data-edit-key="${escapeHtml(key)}" aria-label="Editar atividade ${escapeHtml(item.id)}" title="Editar">${iconEdit}</button></td>
+          <td data-label="Ações" class="actions-cell"><div class="row-actions"><button class="icon-button edit-button" type="button" data-edit-key="${escapeHtml(key)}" aria-label="Editar atividade ${escapeHtml(item.id)}" title="Editar">${iconEdit}</button><button class="icon-button delete-button" type="button" data-delete-key="${escapeHtml(key)}" data-delete-id="${escapeHtml(item.id)}" aria-label="Excluir atividade ${escapeHtml(item.id)}" title="Excluir">${iconTrash}</button></div></td>
           <td data-label="DRAFT"><span class="cell-primary">${escapeHtml(item.draft || "—")}</span></td>
+          <td data-label="Data"><span class="cell-date">${escapeHtml(formatActivityDate(item.data))}</span></td>
         </tr>`;
     }).join("");
 
@@ -604,7 +611,21 @@
       });
     });
     body.querySelectorAll("[data-edit-key]").forEach((button) => button.addEventListener("click", () => openEdit(button.dataset.editKey)));
+    body.querySelectorAll("[data-delete-key]").forEach((button) => button.addEventListener("click", () => deleteActivity(button.dataset.deleteKey, button.dataset.deleteId)));
     body.querySelectorAll("[data-service-calculator]").forEach((button) => button.addEventListener("click", () => openServiceCalculator(button.dataset.serviceCalculator)));
+  }
+
+  async function deleteActivity(reference, activityId) {
+    if (!confirm(`Excluir definitivamente a atividade ${activityId} da planilha?`)) return;
+    try {
+      await getJson(`/api/activities/${encodeURIComponent(reference)}`, { method: "DELETE" });
+      toast("Atividade excluída", `O registro ${activityId} foi removido do Excel.`);
+      listState.selectedKey = null;
+      document.querySelector("#selection-bar").hidden = true;
+      await loadActivities();
+    } catch (error) {
+      toast("Não foi possível excluir", error.message, true);
+    }
   }
 
   function selectRow(key) {
@@ -713,7 +734,7 @@
   const activityFields = [
     "id", "data", "tipo_atividade", "status", "situacao", "empresa", "eps",
     "tecnico_nome", "matricula", "regiao", "cluster", "tecnologia",
-    "custo_mo", "custo_mat", "custo_evitado", "draft",
+    "custo_mo", "custo_mat", "custo_evitado", "gap", "draft",
   ];
 
   function populateFormOptions(options) {
@@ -779,7 +800,9 @@
       if (form.elements[field].tagName === "SELECT") ensureSelectValue(form.elements[field], activity[field]);
       else form.elements[field].value = activity[field] ?? "";
     });
-    applyTechnologyServiceCost({ preserveCurrent: true });
+    const category = normalize(form.elements.tipo_atividade.value).trim();
+    if (["reparo", "ativacao"].includes(category)) applyCategoryTechnology();
+    else applyTechnologyServiceCost({ preserveCurrent: true });
     document.querySelector("#save-status").textContent = "";
     formatCurrencyFields();
     recalculate();
@@ -818,12 +841,35 @@
     document.querySelector("#calc-avoided").value = money.format(labor);
     document.querySelector("#calc-avoided").textContent = money.format(labor);
     document.querySelector("#edit-form").elements.custo_evitado.value = labor.toFixed(2);
+    const category = normalize(document.querySelector("#edit-form").elements.tipo_atividade?.value).trim();
+    const technology = normalize(document.querySelector("#form-technology")?.value).trim();
+    const automaticGap = ["reparo", "ativacao"].includes(category) && technology === category;
+    const gapValue = automaticGap ? labor : formNumber("gap");
+    document.querySelector("#edit-form").elements.gap.value = gapValue.toFixed(2);
     const gap = document.querySelector("#calc-gap");
-    gap.classList.remove("is-positive", "is-negative");
-    gap.classList.add("is-neutral");
-    gap.textContent = "Por categoria";
-    gap.setAttribute("aria-label", "GAP calculado por categoria no Dashboard");
-    document.querySelector("#calc-gap-detail").textContent = "Serviços menos o valor mensal da equipe configurada.";
+    gap.classList.remove("is-positive", "is-negative", "is-neutral");
+    gap.classList.add(gapValue > 0 ? "is-positive" : gapValue < 0 ? "is-negative" : "is-neutral");
+    gap.textContent = money.format(gapValue);
+    gap.setAttribute("aria-label", `GAP da atividade: ${money.format(gapValue)}`);
+    document.querySelector("#calc-gap-detail").textContent = automaticGap
+      ? "Mesmo valor do serviço configurado para a categoria."
+      : "Valor preservado da atividade.";
+  }
+
+  function applyCategoryTechnology() {
+    const category = normalize(document.querySelector("#form-category")?.value).trim();
+    if (!["reparo", "ativacao"].includes(category)) {
+      recalculate();
+      return;
+    }
+    const technology = document.querySelector("#form-technology");
+    const matching = [...technology.options].find((option) => normalize(option.value).trim() === category);
+    if (!matching) {
+      recalculate();
+      return;
+    }
+    technology.value = matching.value;
+    applyTechnologyServiceCost();
   }
 
   function applyTechnologyServiceCost({ preserveCurrent = false } = {}) {
@@ -871,6 +917,8 @@
       if (option?.dataset.registration) document.querySelector("#form-registration").value = option.dataset.registration;
     });
     document.querySelector("#form-technology").addEventListener("change", () => applyTechnologyServiceCost());
+    document.querySelector("#form-category").addEventListener("change", applyCategoryTechnology);
+    document.querySelector("#form-category").addEventListener("input", debounce(applyCategoryTechnology, 120));
     document.querySelectorAll("[data-modal-close]").forEach((button) => button.addEventListener("click", closeModal));
     document.querySelector("#edit-modal").addEventListener("click", (event) => {
       if (event.target === event.currentTarget) closeModal();

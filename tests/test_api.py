@@ -9,7 +9,7 @@ from contextlib import nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
 PROJECT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT))
@@ -91,6 +91,28 @@ class ApiTests(unittest.TestCase):
         data = self.get_json("/api/activities?technology=GPON&q=RASCUNHO-1&sort=draft")
         self.assertEqual(data["pagination"]["total"], 1)
         self.assertEqual(data["items"][0]["draft"], "RASCUNHO-1")
+
+    def test_default_activity_order_places_blank_dates_first_then_newest(self):
+        import openpyxl
+
+        workbook = openpyxl.load_workbook(self.path)
+        sheet = workbook["Atividades"]
+        sheet.append([5, "Reparo", "Concluída", "Teste", "GPON", "", 10, 1, 11, 100, 1, 1, ""])
+        sheet.tables["Atividades"].ref = "A1:M6"
+        workbook.save(self.path)
+        workbook.close()
+
+        data = self.get_json("/api/activities?per_page=10")
+        self.assertEqual([item["id"] for item in data["items"]], ["5", "2", "1", "4", "3"])
+
+    def test_delete_activity_endpoint_removes_exact_row(self):
+        request = Request(self.url + "/api/activities/2%3A1", method="DELETE")
+        with urlopen(request, timeout=5) as response:
+            payload = json.load(response)
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["activity"]["id"], "1")
+        data = self.get_json("/api/activities?per_page=10")
+        self.assertNotIn("1", [item["id"] for item in data["items"]])
 
     def test_export_uses_stable_summary_applies_month_and_does_not_modify_source(self):
         import openpyxl

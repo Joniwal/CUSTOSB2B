@@ -430,7 +430,9 @@ def validate_update(
 
     activity = {"id": clean_text(activity_id, 60)}
     for field in FIELD_NAMES[1:]:
-        if field in ("custo_total", "custo_por_tecnico", "gap", "atualizado_em"):
+        if field in ("custo_total", "custo_por_tecnico", "atualizado_em"):
+            continue
+        if field == "gap" and use_team_gap:
             continue
         activity[field] = to_number(payload.get(field)) if field in NUMERIC_FIELDS else clean_text(payload.get(field))
 
@@ -1615,8 +1617,10 @@ class LocalExcelRepository:
         technology_rates: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
         prepared_payload = dict(payload)
+        category_key = normalize_header(prepared_payload.get("tipo_atividade"))
         technology_key = normalize_header(prepared_payload.get("tecnologia"))
-        if technology_key and technology_rates is not None:
+        automatic_category = category_key in {normalize_header("REPARO"), normalize_header("ATIVAÇÃO")}
+        if technology_rates is not None:
             rate_by_technology = {
                 normalize_header(item.get("name")): max(0.0, to_number(item.get("service_cost")))
                 for item in technology_rates
@@ -1626,11 +1630,22 @@ class LocalExcelRepository:
                     and item.get("configured", True) is not False
                 )
             }
+            name_by_technology = {
+                normalize_header(item.get("name")): clean_text(item.get("name"), 160)
+                for item in technology_rates
+                if isinstance(item, dict) and clean_text(item.get("name"))
+            }
+            matched_automatic_category = automatic_category and category_key in rate_by_technology
+            if matched_automatic_category:
+                prepared_payload["tecnologia"] = name_by_technology[category_key]
+                technology_key = category_key
             # ERB pode usar uma calculadora externa. Nesse caso, o valor
             # informado no formulário deve ser preservado em vez de ser
             # substituído pelo cadastro padrão da tecnologia.
             if technology_key != normalize_header("ERB") and technology_key in rate_by_technology:
                 prepared_payload["custo_mo"] = rate_by_technology[technology_key]
+            if matched_automatic_category:
+                prepared_payload["gap"] = max(0.0, to_number(prepared_payload.get("custo_mo")))
         activity = validate_update(activity_id, prepared_payload, use_team_gap=use_team_gap)
         activity["calculation_mode"] = mode
         activity["_use_team_gap"] = use_team_gap
@@ -1745,6 +1760,29 @@ class LocalExcelRepository:
                 sheet.auto_filter.ref = (
                     f"{get_column_letter(min_col)}{min_row}:"
                     f"{get_column_letter(max_col)}{target_row}"
+                )
+
+    @staticmethod
+    def _shrink_tables_after_delete(sheet, deleted_row: int) -> None:
+        from openpyxl.utils import get_column_letter, range_boundaries
+
+        for table in sheet.tables.values():
+            min_col, min_row, max_col, max_row = range_boundaries(table.ref)
+            if min_row < deleted_row <= max_row:
+                max_row = max(min_row, max_row - 1)
+                table.ref = (
+                    f"{get_column_letter(min_col)}{min_row}:"
+                    f"{get_column_letter(max_col)}{max_row}"
+                )
+                if table.autoFilter is not None:
+                    table.autoFilter.ref = table.ref
+        if sheet.auto_filter.ref:
+            min_col, min_row, max_col, max_row = range_boundaries(sheet.auto_filter.ref)
+            if min_row < deleted_row <= max_row:
+                max_row = max(min_row, max_row - 1)
+                sheet.auto_filter.ref = (
+                    f"{get_column_letter(min_col)}{min_row}:"
+                    f"{get_column_letter(max_col)}{max_row}"
                 )
 
     def _save_workbook(self, workbook) -> None:
@@ -1871,6 +1909,64 @@ class LocalExcelRepository:
                 raise RepositoryError("O Excel está bloqueado para inclusão. Feche o arquivo ou verifique a sincronização.") from exc
             except OSError as exc:
                 raise RepositoryError(f"Não foi possível incluir no Excel: {exc}") from exc
+
+    def delete_activity(self, activity_reference: str) -> dict[str, Any]:
+        with self._lock:
+            openpyxl = self._openpyxl()
+            try:
+                workbook = self._load_workbook(openpyxl, keep_vba=self.file_path.suffix.casefold() == ".xlsm")
+                if self.sheet_name not in workbook.sheetnames:
+                    raise RepositoryError(f"Aba '{self.sheet_name}' não encontrada.")
+                sheet = workbook[self.sheet_name]
+                _headers, field_columns, _mode = self._schema(sheet)
+                target_row = self._find_activity_row(sheet, field_columns, activity_reference)
+                activity_id = clean_text(sheet.cell(target_row, field_columns["id"]).value, 60)
+                record_key = self._record_key(target_row, activity_id)
+
+                for calculation_sheet_name in (SERVICE_CALC_SHEET, MATERIAL_CALC_SHEET):
+                    if calculation_sheet_name not in workbook.sheetnames:
+                        continue
+                    calculation_sheet = workbook[calculation_sheet_name]
+                    for row_number in range(calculation_sheet.max_row, 1, -1):
+                        stored_key = clean_text(calculation_sheet.cell(row_number, 1).value, 200)
+                        if stored_key == record_key:
+                            calculation_sheet.delete_rows(row_number, 1)
+                            continue
+                        match = re.fullmatch(r"(\d+):(.*)", stored_key)
+                        if match and int(match.group(1)) > target_row:
+                            calculation_sheet.cell(row_number, 1).value = (
+                                f"{int(match.group(1)) - 1}:{match.group(2)}"
+                            )
+
+                sheet.delete_rows(target_row, 1)
+                self._shrink_tables_after_delete(sheet, target_row)
+
+                # openpyxl moves formulas as text when rows are deleted. Shift
+                # relative references one row up so formulas continue pointing
+                # to the activity now occupying that row.
+                from openpyxl.formula.translate import Translator
+                from openpyxl.utils import get_column_letter
+
+                for row_number in range(target_row, sheet.max_row + 1):
+                    for column_number in range(1, sheet.max_column + 1):
+                        cell = sheet.cell(row_number, column_number)
+                        if not isinstance(cell.value, str) or not cell.value.startswith("="):
+                            continue
+                        coordinate = f"{get_column_letter(column_number)}{row_number}"
+                        old_coordinate = f"{get_column_letter(column_number)}{row_number + 1}"
+                        try:
+                            cell.value = Translator(cell.value, origin=old_coordinate).translate_formula(coordinate)
+                        except (TypeError, ValueError):
+                            pass
+
+                self._save_workbook(workbook)
+                return {"id": activity_id, "record_key": record_key}
+            except PermissionError as exc:
+                raise RepositoryError(
+                    "O Excel está bloqueado para exclusão. Feche o arquivo ou verifique a sincronização."
+                ) from exc
+            except OSError as exc:
+                raise RepositoryError(f"Não foi possível excluir a atividade do Excel: {exc}") from exc
 
     def export_activities(self, activities: list[dict[str, Any]] | None = None) -> tuple[str, bytes]:
         """Export a stable, formatted summary independent of the source workbook layout."""

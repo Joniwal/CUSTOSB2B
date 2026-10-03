@@ -13,6 +13,7 @@ sys.path.insert(0, str(PROJECT))
 from excel_repository import (  # noqa: E402
     LocalExcelRepository,
     RepositoryError,
+    SERVICE_CALC_HEADERS,
     business_days_for_month,
     calculate_values,
     discover_excel_file,
@@ -107,6 +108,13 @@ class CalculationTests(unittest.TestCase):
         self.assertIn('Custo Serviço', html)
         self.assertNotIn('name="ganho_esperado"', html)
         self.assertNotIn('valor técnico/dia × técnicos × dias neste formulário', html)
+        self.assertIn('id="form-category"', html)
+        self.assertIn('id="form-situation"', html)
+        self.assertIn('value="ATENDIMENTO CLIENTE FINAL"', html)
+        self.assertIn('value="CONCLUÍDO"', html)
+        self.assertIn('data-sort="data"', html)
+        self.assertIn('data-delete-key=', javascript)
+        self.assertIn('method: "DELETE"', javascript)
 
     def test_duplicate_id_on_create_requires_explicit_permission(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1214,7 +1222,7 @@ class CalculationTests(unittest.TestCase):
             self.assertEqual(sheet["I2"].value, 3)
             self.assertEqual(sheet["N2"].value, "=H2+J2")
             self.assertEqual(sheet["P2"].value, 75)
-            self.assertEqual(sheet["Q2"].value, 0)
+            self.assertEqual(sheet["Q2"].value, 145)
             workbook.close()
 
     def test_technology_value_populates_generic_activity_without_daily_team_formula(self):
@@ -1271,6 +1279,106 @@ class CalculationTests(unittest.TestCase):
             self.assertEqual(created["custo_mo"], 1_250)
             self.assertEqual(created["custo_total"], 1_300)
             self.assertEqual(created["gap"], 0)
+
+    def test_repair_category_uses_matching_technology_for_service_total_and_gap(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            data_dir = temp_root / "data"
+            data_dir.mkdir()
+            workbook_path = data_dir / "B2B_CTACUSTOS.xlsx"
+            create_test_activity_workbook(workbook_path)
+
+            with patch.dict(
+                os.environ,
+                {
+                    "EXCEL_SEARCH_ROOTS": "data",
+                    "EXCEL_FILENAME": workbook_path.name,
+                    "EXCEL_SHEET_NAME": "Atividades",
+                    "EXCEL_FALLBACK_SAMPLE": "false",
+                },
+                clear=False,
+            ):
+                os.environ.pop("EXCEL_PATH", None)
+                repository = LocalExcelRepository(temp_root)
+                repository.save_settings(
+                    {
+                        "reference_month": "2026-09",
+                        "monthly_technician_cost": 15_000,
+                        "business_days": 22,
+                        "statuses": ["CONCLUÍDO"],
+                        "types": ["REPARO", "ATIVAÇÃO"],
+                        "technology_rates": [
+                            {"name": "REPARO", "service_cost": 850},
+                            {"name": "ATIVAÇÃO", "service_cost": 1_100},
+                        ],
+                        "category_teams": [],
+                        "technicians": [],
+                        "companies": [],
+                        "eps": [],
+                    }
+                )
+                created = repository.create_activity(
+                    {
+                        "tipo_atividade": "REPARO",
+                        "status": "CONCLUÍDO",
+                        "situacao": "ATENDIMENTO CLIENTE FINAL",
+                        "tecnologia": "ATIVAÇÃO",
+                        "custo_mo": 10,
+                        "custo_mat": 100,
+                        "gap": 0,
+                    }
+                )
+
+            self.assertEqual(created["tecnologia"], "REPARO")
+            self.assertEqual(created["custo_mo"], 850)
+            self.assertEqual(created["custo_total"], 950)
+            self.assertEqual(created["custo_evitado"], 850)
+            self.assertEqual(created["gap"], 850)
+
+    def test_delete_activity_removes_calculations_and_preserves_shifted_formula(self):
+        import openpyxl
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_root = Path(temp_dir)
+            data_dir = temp_root / "data"
+            data_dir.mkdir()
+            workbook_path = data_dir / "B2B_CTACUSTOS.xlsx"
+            create_test_activity_workbook(workbook_path)
+
+            workbook = openpyxl.load_workbook(workbook_path)
+            sheet = workbook["Atividades"]
+            sheet["L3"] = "=H3+K3"
+            calc_sheet = workbook.create_sheet("Calculo_Servicos")
+            calc_sheet.append(SERVICE_CALC_HEADERS)
+            calc_sheet.append(["2:ATV-001", "ATV-001", "S1", "1", "Serviço 1", "UN", 10, 1, 10, datetime.now()])
+            calc_sheet.append(["3:ATV-002", "ATV-002", "S2", "2", "Serviço 2", "UN", 20, 1, 20, datetime.now()])
+            workbook.save(workbook_path)
+            workbook.close()
+
+            with patch.dict(
+                os.environ,
+                {
+                    "EXCEL_SEARCH_ROOTS": "data",
+                    "EXCEL_FILENAME": workbook_path.name,
+                    "EXCEL_SHEET_NAME": "Atividades",
+                    "EXCEL_FALLBACK_SAMPLE": "false",
+                },
+                clear=False,
+            ):
+                os.environ.pop("EXCEL_PATH", None)
+                repository = LocalExcelRepository(temp_root)
+                deleted = repository.delete_activity("2:ATV-001")
+
+            self.assertEqual(deleted["id"], "ATV-001")
+            workbook = openpyxl.load_workbook(workbook_path, data_only=False)
+            sheet = workbook["Atividades"]
+            self.assertEqual(sheet["A2"].value, "ATV-002")
+            self.assertEqual(sheet["L2"].value, "=H2+K2")
+            self.assertEqual(sheet.tables["AtividadesTestTable"].ref, "A1:S5")
+            calc_sheet = workbook["Calculo_Servicos"]
+            self.assertEqual(calc_sheet.max_row, 2)
+            self.assertEqual(calc_sheet["A2"].value, "2:ATV-002")
+            workbook.close()
 
     def test_erb_preserves_service_cost_from_external_calculator(self):
         with tempfile.TemporaryDirectory() as temp_dir:
