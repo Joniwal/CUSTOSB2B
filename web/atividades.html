@@ -8,7 +8,7 @@
   <title>Atividades · B2B CTACUSTOS</title>
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
   <link rel="alternate icon" href="/favicon.ico">
-  <link rel="stylesheet" href="/static/app.css?v=20261003-1">
+  <link rel="stylesheet" href="/static/app.css?v=20261009-1">
 </head>
 <body data-page="activities">
   <a class="skip-link" href="#conteudo">Ir para o conteúdo principal</a>
@@ -187,7 +187,7 @@
             <label class="input-group"><span>Data</span><input name="data" type="date" required></label>
             <label class="input-group"><span>Categoria</span><input name="tipo_atividade" id="form-category" list="type-options" required maxlength="120"><datalist id="type-options"></datalist></label>
             <label class="input-group"><span>Status</span><select name="status" id="form-status" required><option value="">Selecione</option></select></label>
-            <label class="input-group input-group--wide"><span>Situação / detalhes</span><select name="situacao" id="form-situation" required><option value="">Selecione</option><option value="ATENDIMENTO CLIENTE FINAL">ATENDIMENTO CLIENTE FINAL</option><option value="CONCLUÍDO">CONCLUÍDO</option></select></label>
+            <label class="input-group input-group--wide"><span>Situação / detalhes</span><select name="situacao" id="form-situation" required><option value="">Selecione</option><option value="ATENDIMENTO CLIENTE FINAL">ATENDIMENTO CLIENTE FINAL</option><option value="CONCLUÍDO">CONCLUÍDO</option><option value="EM APROVAÇÃO">EM APROVAÇÃO</option><option value="EM PRODUÇÃO">EM PRODUÇÃO</option></select></label>
             <fieldset class="duplicate-id-control">
               <legend>Validação do ID</legend>
               <label><input type="radio" name="allow_duplicate_id" value="false" checked> Exigir ID único</label>
@@ -204,6 +204,7 @@
             <label class="input-group"><span>EPS</span><select name="eps" id="form-eps"><option value="">Selecione</option></select></label>
             <label class="input-group input-group--wide"><span>Nome do técnico</span><select name="tecnico_nome" id="form-technician"><option value="">Selecione</option></select></label>
             <label class="input-group"><span>Matrícula</span><input name="matricula" id="form-registration" maxlength="60"></label>
+            <label class="input-group"><span>Em Campo</span><select name="em_campo" id="form-field-work" required><option value="NÃO" selected>NÃO</option><option value="SIM">SIM</option></select></label>
             <label class="input-group"><span>Região</span><input name="regiao" list="region-options" maxlength="80"><datalist id="region-options"></datalist></label>
             <label class="input-group"><span>Cluster</span><input name="cluster" list="cluster-options" maxlength="80"><datalist id="cluster-options"></datalist></label>
             <label class="input-group input-group--wide"><span>Tecnologia</span><select name="tecnologia" id="form-technology"><option value="">Selecione</option></select><small>O valor configurado será aplicado automaticamente. Para ERB, informe o valor obtido na calculadora externa.</small></label>
@@ -368,6 +369,6 @@
   </dialog>
 
   <div class="toast-region" id="toast-region" role="status" aria-live="polite"></div>
-  <script src="/static/app.js?v=20261003-1" defer></script>
+  <script src="/static/app.js?v=20261009-1" defer></script>
 </body>
 </html>

@@ -112,6 +112,13 @@ class CalculationTests(unittest.TestCase):
         self.assertIn('id="form-situation"', html)
         self.assertIn('value="ATENDIMENTO CLIENTE FINAL"', html)
         self.assertIn('value="CONCLUÍDO"', html)
+        self.assertIn('value="EM APROVAÇÃO"', html)
+        self.assertIn('value="EM PRODUÇÃO"', html)
+        self.assertIn('name="em_campo"', html)
+        self.assertIn('value="NÃO" selected', html)
+        self.assertIn('value="SIM"', html)
+        self.assertIn('syncTechnicianRegistration();', javascript)
+        self.assertIn('syncTechnicianRegistration({ overwrite: true });', javascript)
         self.assertIn('data-sort="data"', html)
         self.assertIn('data-delete-key=', javascript)
         self.assertIn('method: "DELETE"', javascript)
@@ -826,17 +833,20 @@ class CalculationTests(unittest.TestCase):
                 repository = LocalExcelRepository(temp_root)
                 activity = repository.list_activities()[0]
                 activity["draft"] = "DRAFT-001"
+                activity["em_campo"] = "SIM"
                 repository.update_activity(activity["record_key"], activity)
                 export_name, export_bytes = repository.export_activities([activity])
 
             source_workbook = openpyxl.load_workbook(workbook_path, data_only=False)
             source_sheet = source_workbook["Atividades"]
-            self.assertEqual(source_sheet.cell(1, source_sheet.max_column).value, "DRAFT")
-            self.assertEqual(source_sheet.cell(2, source_sheet.max_column).value, "DRAFT-001")
-            self.assertEqual(source_sheet.tables["AtividadesTestTable"].ref, "A1:T6")
-            self.assertEqual(len(source_sheet.tables["AtividadesTestTable"].tableColumns), 20)
-            self.assertEqual(source_sheet.tables["AtividadesTestTable"].tableColumns[-1].name, "DRAFT")
-            self.assertEqual(source_sheet.tables["AtividadesTestTable"].autoFilter.ref, "A1:T6")
+            self.assertEqual(source_sheet["T1"].value, "DRAFT")
+            self.assertEqual(source_sheet["T2"].value, "DRAFT-001")
+            self.assertEqual(source_sheet["U1"].value, "EM CAMPO")
+            self.assertEqual(source_sheet["U2"].value, "SIM")
+            self.assertEqual(source_sheet.tables["AtividadesTestTable"].ref, "A1:U6")
+            self.assertEqual(len(source_sheet.tables["AtividadesTestTable"].tableColumns), 21)
+            self.assertEqual(source_sheet.tables["AtividadesTestTable"].tableColumns[-1].name, "EM CAMPO")
+            self.assertEqual(source_sheet.tables["AtividadesTestTable"].autoFilter.ref, "A1:U6")
             source_workbook.close()
 
             exported_workbook = openpyxl.load_workbook(io.BytesIO(export_bytes), data_only=False)
@@ -848,14 +858,15 @@ class CalculationTests(unittest.TestCase):
                     "ID", "Data", "Tipo de Atividade", "Status", "Situação", "Tecnologia",
                     "Empresa", "EPS", "Matrícula", "Nome do Técnico", "Custo Serviço",
                     "Custo Material", "Custo Total", "Custo Evitado", "Qtde Técnicos",
-                    "Qtde Dias", "GAP", "DRAFT",
+                    "Qtde Dias", "GAP", "DRAFT", "EM CAMPO",
                 ],
             )
             self.assertEqual(exported_sheet["R2"].value, "DRAFT-001")
+            self.assertEqual(exported_sheet["S2"].value, "SIM")
             self.assertEqual(exported_sheet["A1"].fill.fgColor.rgb, "007A2F73")
             self.assertEqual(exported_sheet["K2"].number_format, '"R$" #,##0.00')
-            self.assertEqual(exported_sheet.tables["AtividadesExportadas"].ref, "A1:R2")
-            self.assertEqual(len(exported_sheet.tables["AtividadesExportadas"].tableColumns), 18)
+            self.assertEqual(exported_sheet.tables["AtividadesExportadas"].ref, "A1:S2")
+            self.assertEqual(len(exported_sheet.tables["AtividadesExportadas"].tableColumns), 19)
             self.assertTrue(export_name.startswith("ATIVIDADES_RESUMO_"))
             exported_workbook.close()
 
@@ -1039,6 +1050,7 @@ class CalculationTests(unittest.TestCase):
                         "matricula": "A2",
                         "tecnico_nome": "BRUNO",
                         "eps": "VIVO",
+                        "em_campo": "SIM",
                     }
                 )
 
@@ -1047,8 +1059,10 @@ class CalculationTests(unittest.TestCase):
             self.assertEqual(created["id"], "2")
             self.assertEqual(sheet.max_row, 3)
             self.assertEqual(sheet["A3"].fill.fgColor.rgb, sheet["A2"].fill.fgColor.rgb)
-            self.assertEqual(sheet.tables["AtividadesTable"].ref, "A1:N3")
+            self.assertEqual(sheet.tables["AtividadesTable"].ref, "A1:O3")
             self.assertEqual(sheet["N1"].value, "DRAFT")
+            self.assertEqual(sheet["O1"].value, "EM CAMPO")
+            self.assertEqual(sheet["O3"].value, "SIM")
             self.assertEqual(sheet["C3"].value, "VIVO")
             self.assertEqual(sheet["G3"].value, 275)
             verified.close()

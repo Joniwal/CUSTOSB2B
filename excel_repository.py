@@ -46,6 +46,7 @@ HEADERS = [
     "Tecnologia",
     "Ganho Esperado/Importância",
     "DRAFT",
+    "EM CAMPO",
 ]
 
 FIELD_NAMES = [
@@ -78,6 +79,7 @@ FIELD_NAMES = [
     "tecnologia",
     "ganho_esperado",
     "draft",
+    "em_campo",
 ]
 
 NUMERIC_FIELDS = {
@@ -109,6 +111,7 @@ EXTRA_HEADER_ALIASES = {
     "tecnologia": ("BBR/B2B/GPON",),
     "ganho_esperado": ("Ganho Esperado/Importancia",),
     "draft": ("Draft",),
+    "em_campo": ("Em Campo",),
 }
 
 SERVICE_CATEGORIES = (
@@ -146,6 +149,7 @@ EXPORT_COLUMNS = (
     ("Qtde Dias", "qtde_dias", "integer"),
     ("GAP", "gap", "currency"),
     ("DRAFT", "draft", "text"),
+    ("EM CAMPO", "em_campo", "text"),
 )
 
 SERVICE_CALC_SHEET = "Calculo_Servicos"
@@ -435,6 +439,12 @@ def validate_update(
         if field == "gap" and use_team_gap:
             continue
         activity[field] = to_number(payload.get(field)) if field in NUMERIC_FIELDS else clean_text(payload.get(field))
+
+    em_campo_key = normalize_header(activity.get("em_campo"))
+    if em_campo_key:
+        if em_campo_key not in {"sim", "nao"}:
+            raise ValueError("Em Campo deve ser SIM ou NÃO.")
+        activity["em_campo"] = "SIM" if em_campo_key == "sim" else "NÃO"
 
     for field in NUMERIC_FIELDS:
         if field in activity and activity[field] < 0 and field != "gap":
@@ -1495,50 +1505,54 @@ class LocalExcelRepository:
         )
         return activity_options
 
-    def _ensure_draft_column(self, sheet) -> None:
-        """Append DRAFT without disturbing the existing table formatting."""
-        if "draft" in resolve_field_columns(cell.value for cell in sheet[1]):
+    def _ensure_optional_column(self, sheet, field_name: str, header_name: str) -> None:
+        """Append one optional field without disturbing table formatting."""
+        if field_name in resolve_field_columns(cell.value for cell in sheet[1]):
             return
 
         from openpyxl.utils import get_column_letter, range_boundaries
         from openpyxl.worksheet.table import TableColumn
 
         previous_column = max(1, sheet.max_column)
-        draft_column = previous_column + 1
+        target_column = previous_column + 1
         header_source = sheet.cell(1, previous_column)
-        header_target = sheet.cell(1, draft_column, "DRAFT")
+        header_target = sheet.cell(1, target_column, header_name)
         if header_source.has_style:
             header_target._style = copy(header_source._style)
         header_target.number_format = header_source.number_format
 
         for row_number in range(2, sheet.max_row + 1):
             source = sheet.cell(row_number, previous_column)
-            target = sheet.cell(row_number, draft_column)
+            target = sheet.cell(row_number, target_column)
             if source.has_style:
                 target._style = copy(source._style)
             target.number_format = source.number_format
 
         previous_letter = get_column_letter(previous_column)
-        draft_letter = get_column_letter(draft_column)
+        target_letter = get_column_letter(target_column)
         previous_dimension = sheet.column_dimensions[previous_letter]
-        draft_dimension = sheet.column_dimensions[draft_letter]
-        draft_dimension.width = previous_dimension.width or 18
-        draft_dimension.hidden = previous_dimension.hidden
+        target_dimension = sheet.column_dimensions[target_letter]
+        target_dimension.width = previous_dimension.width or 18
+        target_dimension.hidden = previous_dimension.hidden
 
         for table in sheet.tables.values():
             min_col, min_row, max_col, max_row = range_boundaries(table.ref)
             if min_row == 1 and max_col == previous_column:
-                table.ref = f"{get_column_letter(min_col)}{min_row}:{draft_letter}{max_row}"
+                table.ref = f"{get_column_letter(min_col)}{min_row}:{target_letter}{max_row}"
                 if table.tableColumns:
                     next_id = max(column.id for column in table.tableColumns) + 1
-                    table.tableColumns.append(TableColumn(id=next_id, name="DRAFT"))
+                    table.tableColumns.append(TableColumn(id=next_id, name=header_name))
                 if table.autoFilter is not None:
                     table.autoFilter.ref = table.ref
 
         if sheet.auto_filter.ref:
             min_col, min_row, max_col, max_row = range_boundaries(sheet.auto_filter.ref)
             if min_row == 1 and max_col == previous_column:
-                sheet.auto_filter.ref = f"{get_column_letter(min_col)}{min_row}:{draft_letter}{max_row}"
+                sheet.auto_filter.ref = f"{get_column_letter(min_col)}{min_row}:{target_letter}{max_row}"
+
+    def _ensure_activity_optional_columns(self, sheet) -> None:
+        self._ensure_optional_column(sheet, "draft", "DRAFT")
+        self._ensure_optional_column(sheet, "em_campo", "EM CAMPO")
 
     def _schema(self, sheet) -> tuple[list[Any], dict[str, int], str]:
         headers = [cell.value for cell in sheet[1]]
@@ -1810,7 +1824,7 @@ class LocalExcelRepository:
                 if self.sheet_name not in workbook.sheetnames:
                     raise RepositoryError(f"Aba '{self.sheet_name}' não encontrada.")
                 sheet = workbook[self.sheet_name]
-                self._ensure_draft_column(sheet)
+                self._ensure_activity_optional_columns(sheet)
                 headers, field_columns, mode = self._schema(sheet)
 
                 target_row = self._find_activity_row(sheet, field_columns, activity_id)
@@ -1865,7 +1879,7 @@ class LocalExcelRepository:
                 if self.sheet_name not in workbook.sheetnames:
                     raise RepositoryError(f"Aba '{self.sheet_name}' não encontrada.")
                 sheet = workbook[self.sheet_name]
-                self._ensure_draft_column(sheet)
+                self._ensure_activity_optional_columns(sheet)
                 headers, field_columns, mode = self._schema(sheet)
 
                 existing_ids = {
@@ -2372,7 +2386,7 @@ class LocalExcelRepository:
                 if self.sheet_name not in workbook.sheetnames:
                     raise RepositoryError(f"Aba '{self.sheet_name}' não encontrada.")
                 activity_sheet = workbook[self.sheet_name]
-                self._ensure_draft_column(activity_sheet)
+                self._ensure_activity_optional_columns(activity_sheet)
                 headers, field_columns, mode = self._schema(activity_sheet)
                 if "custo_mo" not in field_columns:
                     raise RepositoryError("A coluna Custo MO não foi encontrada na base de atividades.")

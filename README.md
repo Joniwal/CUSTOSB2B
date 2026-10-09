@@ -15,7 +15,8 @@ Aplicação local e responsiva para consultar, incluir, editar e excluir ativida
 - Inclusão e edição usam Categoria e uma lista controlada de Situação. Reparo e Ativação associam automaticamente a tecnologia de mesmo nome e seu valor configurado ao Custo Serviço, Custo Total e GAP.
 - Exclusão por linha remove a atividade e seus itens vinculados das calculadoras, mantendo a tabela e as fórmulas da planilha ajustadas.
 - Exportar Excel em uma versão resumida, com colunas fixas e formatação profissional, incluindo DRAFT.
-- Campo DRAFT ao final da listagem e nos formulários de inclusão e edição.
+- Campos DRAFT e EM CAMPO nos formulários de inclusão e edição; EM CAMPO é salvo como SIM ou NÃO na base.
+- Ao abrir uma atividade ou selecionar um técnico cadastrado, a matrícula correspondente é preenchida automaticamente quando estiver disponível.
 - Inclusão e edição pelo mesmo formulário, com opções de status, empresa, EPS e técnico administradas no próprio aplicativo.
 - Calculadora em duas abas, Materiais e Serviços, aberta pelo ícone antes de cada atividade e já vinculada ao registro correto.
 - Catálogos lidos de `MATERIAIS.xlsx` e `SERVICOS.xlsx`, com seleção de itens, quantidades, subtotais, total de material e total de serviços.
@@ -29,7 +30,7 @@ Aplicação local e responsiva para consultar, incluir, editar e excluir ativida
 
 Ao atualizar uma atividade, somente os valores das células correspondentes são alterados. Ao incluir, o aplicativo copia a formatação da última linha, mantém os formatos numéricos e amplia o intervalo da Tabela do Excel para abranger a nova linha. Para evitar conflitos de gravação, feche a planilha no Excel antes de incluir, editar ou salvar configurações.
 
-A coluna `DRAFT` é preservada na base e criada ao final, quando ausente, na primeira gravação. O botão **Exportar Excel** gera uma versão resumida estável com ID, data, atividade, status, situação, tecnologia, empresa, EPS, matrícula, técnico, custos, quantidades, GAP e DRAFT. O arquivo exportado possui cabeçalho formatado, tabela com filtros, linhas alternadas, painel congelado e formatos próprios para datas, moeda e números. A exportação respeita os filtros ativos — inclusive mês ou intervalo de datas — sem depender da paginação e sem modificar o arquivo original.
+As colunas `DRAFT` e `EM CAMPO` são preservadas na base e criadas ao final, quando ausentes, na primeira gravação. O botão **Exportar Excel** gera uma versão resumida estável com ID, data, atividade, status, situação, tecnologia, empresa, EPS, matrícula, técnico, custos, quantidades, GAP, DRAFT e EM CAMPO. O arquivo exportado possui cabeçalho formatado, tabela com filtros, linhas alternadas, painel congelado e formatos próprios para datas, moeda e números. A exportação respeita os filtros ativos — inclusive mês ou intervalo de datas — sem depender da paginação e sem modificar o arquivo original.
 
 As telas principais oferecem **Atualizar**, que relê os dados do arquivo Excel, e **Encerrar**, que finaliza o servidor local e libera a porta. O encerramento exige confirmação e só é aceito a partir do próprio computador.
 
@@ -103,6 +104,7 @@ Mantenha `EXCEL_FALLBACK_SAMPLE=false` para exigir a base compartilhada. Se prec
 | L–R | Custo Total, Custo Evitado, Custo Técnico / Dia, Qtde Técnicos, Qtde Dias, Custo por Técnico, GAP |
 | S | Atualizado Em |
 | T | DRAFT (opcional; criado ao final quando ausente) |
+| U | EM CAMPO (SIM/NÃO; criado após DRAFT quando ausente) |
 
 Os nomes podem variar em acentos, espaços ou pontuação, mas os quatro primeiros campos são obrigatórios. A base operacional existente também é aceita pelos aliases de cabeçalhos descritos acima; a ordem das colunas não precisa seguir este exemplo.
 

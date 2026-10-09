@@ -127,16 +127,16 @@ class ApiTests(unittest.TestCase):
             "ID", "Data", "Tipo de Atividade", "Status", "Situação", "Tecnologia",
             "Empresa", "EPS", "Matrícula", "Nome do Técnico", "Custo Serviço",
             "Custo Material", "Custo Total", "Custo Evitado", "Qtde Técnicos",
-            "Qtde Dias", "GAP", "DRAFT",
+            "Qtde Dias", "GAP", "DRAFT", "EM CAMPO",
         ]
         self.assertEqual([cell.value for cell in sheet[1]], expected_headers)
-        self.assertEqual(sheet.max_column, 18)
+        self.assertEqual(sheet.max_column, 19)
         self.assertEqual(sheet.max_row, 3)
         self.assertEqual(sheet["R2"].value, "RASCUNHO-1")
         self.assertEqual(sheet["K2"].number_format, '"R$" #,##0.00')
         self.assertEqual(sheet["B2"].number_format, "dd/mm/yyyy")
         self.assertEqual(sheet["A1"].fill.fgColor.rgb, "007A2F73")
-        self.assertEqual(sheet.tables["AtividadesExportadas"].ref, "A1:R3")
+        self.assertEqual(sheet.tables["AtividadesExportadas"].ref, "A1:S3")
         self.assertEqual(sheet.freeze_panes, "A2")
         exported.close()
         self.assertEqual(self.path.read_bytes(), before)

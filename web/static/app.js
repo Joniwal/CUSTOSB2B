@@ -734,7 +734,7 @@
   const activityFields = [
     "id", "data", "tipo_atividade", "status", "situacao", "empresa", "eps",
     "tecnico_nome", "matricula", "regiao", "cluster", "tecnologia",
-    "custo_mo", "custo_mat", "custo_evitado", "gap", "draft",
+    "custo_mo", "custo_mat", "custo_evitado", "gap", "draft", "em_campo",
   ];
 
   function populateFormOptions(options) {
@@ -769,6 +769,13 @@
     select.value = String(value);
   }
 
+  function syncTechnicianRegistration({ overwrite = false } = {}) {
+    const technician = document.querySelector("#form-technician");
+    const registration = document.querySelector("#form-registration");
+    const selectedRegistration = technician?.selectedOptions?.[0]?.dataset.registration || "";
+    if (overwrite || !registration.value.trim()) registration.value = selectedRegistration;
+  }
+
   function openCreate() {
     const form = document.querySelector("#edit-form");
     form.reset();
@@ -800,6 +807,7 @@
       if (form.elements[field].tagName === "SELECT") ensureSelectValue(form.elements[field], activity[field]);
       else form.elements[field].value = activity[field] ?? "";
     });
+    syncTechnicianRegistration();
     const category = normalize(form.elements.tipo_atividade.value).trim();
     if (["reparo", "ativacao"].includes(category)) applyCategoryTechnology();
     else applyTechnologyServiceCost({ preserveCurrent: true });
@@ -913,8 +921,7 @@
       input.addEventListener("focus", () => input.select());
     });
     document.querySelector("#form-technician").addEventListener("change", (event) => {
-      const option = event.target.selectedOptions[0];
-      if (option?.dataset.registration) document.querySelector("#form-registration").value = option.dataset.registration;
+      syncTechnicianRegistration({ overwrite: true });
     });
     document.querySelector("#form-technology").addEventListener("change", () => applyTechnologyServiceCost());
     document.querySelector("#form-category").addEventListener("change", applyCategoryTechnology);
