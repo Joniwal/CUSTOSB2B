@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import functools
+import glob
 import io
 import hashlib
 import logging
 import os
 import re
+import tempfile
 import threading
+import time
 import unicodedata
 from calendar import monthrange
 from concurrent.futures import ThreadPoolExecutor
@@ -223,7 +227,76 @@ class RepositoryError(RuntimeError):
     pass
 
 
+class _ArquivoMudouDuranteGravacao(RepositoryError):
+    """O arquivo mudou (ex.: OneDrive trouxe a versão de outro usuário) entre a
+    abertura e a gravação. Nada foi gravado; a operação é refeita do zero."""
+
+
 log = logging.getLogger(__name__)
+
+
+def _row_version_enabled() -> bool:
+    return os.getenv("ROW_VERSION_CHECK", "true").strip().casefold() not in {
+        "0", "false", "no", "nao", "não", "off",
+    }
+
+
+def _version_token(value: Any) -> str:
+    if value is None or value == "":
+        return ""
+    if isinstance(value, bool):
+        return str(value)
+    if isinstance(value, (int, float)):
+        return format(float(value), ".10g")  # 5 e 5.0 geram o mesmo texto
+    if isinstance(value, datetime):
+        return value.isoformat(timespec="seconds")
+    if isinstance(value, date):
+        return value.isoformat()
+    return str(value).strip()
+
+
+def row_version(values: dict[str, Any]) -> str:
+    """Impressão digital dos valores de uma linha, para detectar edição concorrente.
+
+    `atualizado_em` fica de fora: muda a cada gravação e perde precisão ao ser
+    relido do Excel, o que geraria falsos conflitos."""
+    parts = [_version_token(values.get(field)) for field in FIELD_NAMES if field != "atualizado_em"]
+    return hashlib.sha1("\x1f".join(parts).encode("utf-8")).hexdigest()[:16]
+
+
+def _retry_if_file_changed(method):
+    """Refaz a operação de gravação (lendo o arquivo de novo) se ele mudou no meio."""
+
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        attempts = 3
+        for attempt in range(1, attempts + 1):
+            try:
+                return method(self, *args, **kwargs)
+            except _ArquivoMudouDuranteGravacao as exc:
+                if attempt == attempts:
+                    raise RepositoryError(str(exc)) from exc
+                log.warning("Excel mudou durante a gravação; tentativa %s/%s", attempt, attempts)
+                time.sleep(0.5 * attempt)
+
+    return wrapper
+
+
+def _estado_onedrive(path: Path) -> str | None:
+    """Windows: se o arquivo está só na nuvem ou mantido no PC (None fora do Windows)."""
+    try:
+        attrs = getattr(path.stat(), "st_file_attributes", None)
+    except OSError:
+        return None
+    if attrs is None:
+        return None
+    if attrs & (0x400000 | 0x40000 | 0x1000):  # RECALL_ON_DATA_ACCESS | RECALL_ON_OPEN | OFFLINE
+        return "somente_online"
+    if attrs & 0x80000:  # PINNED
+        return "sempre_manter_no_dispositivo"
+    if attrs & 0x100000:  # UNPINNED
+        return "no_dispositivo_pode_ser_liberado"
+    return "no_dispositivo"
 
 
 def normalize_header(value: Any) -> str:
@@ -868,6 +941,37 @@ class LocalExcelRepository:
         source_type = "Excel de demonstração" if self.is_sample else "Excel sincronizado"
         return f"{source_type} · {self.file_path.name} · aba {self.sheet_name}"
 
+    def file_status(self) -> dict[str, Any]:
+        """Diagnóstico de frescor: qual arquivo está sendo lido, de quando é e se há
+        cópias em conflito do OneDrive ao lado dele."""
+        path = self.file_path
+        try:
+            info = path.stat()
+            modified = datetime.fromtimestamp(info.st_mtime).isoformat(timespec="seconds")
+            size = info.st_size
+        except OSError:
+            modified, size = None, None
+        conflicts = sorted(
+            str(item)
+            for item in path.parent.glob(f"{glob.escape(path.stem)}*{path.suffix}")
+            if item.name != path.name and not item.name.startswith("~$")
+        )
+        state = _estado_onedrive(path)
+        alerts = []
+        if conflicts:
+            alerts.append("há cópias em conflito do OneDrive ao lado do arquivo")
+        if state == "somente_online":
+            alerts.append("o arquivo está somente na nuvem (não baixado neste PC)")
+        return {
+            "caminho": str(path),
+            "aba": self.sheet_name,
+            "modificado_em": modified,
+            "tamanho_bytes": size,
+            "estado_onedrive": state,
+            "copias_em_conflito": conflicts,
+            "mensagem": "Excel localizado." + (" Atenção: " + "; ".join(alerts) + "." if alerts else ""),
+        }
+
     def _locate_file(self) -> Path:
         explicit = os.getenv("EXCEL_PATH", "").strip()
         if explicit:
@@ -901,7 +1005,17 @@ class LocalExcelRepository:
             raise RepositoryError("Instale a dependência openpyxl: pip install -r requirements.txt") from exc
         return openpyxl
 
+    def _file_signature(self):
+        try:
+            info = os.stat(self.file_path)
+        except OSError:
+            return None
+        return (info.st_mtime_ns, info.st_size)
+
     def _load_workbook(self, openpyxl, **options):
+        if not options.get("read_only"):
+            # Abertura para gravação: guarda a assinatura para conferir antes de substituir.
+            self._write_signature = self._file_signature()
         return self._load_workbook_path(openpyxl, self.file_path, **options)
 
     @staticmethod
@@ -1253,11 +1367,13 @@ class LocalExcelRepository:
                         raw[field] = row[index] if index is not None and index < len(row) else None
                     if raw.get("id") in (None, ""):
                         continue
+                    version = row_version(raw)  # antes de qualquer valor padrão ser injetado
                     raw["calculation_mode"] = calculation_mode(field_columns)
                     if to_number(raw.get("custo_tecnico_dia")) <= 0:
                         raw["custo_tecnico_dia"] = default_daily_rate
                     activity = normalize_activity(raw)
                     activity["record_key"] = self._record_key(row_number, activity["id"])
+                    activity["row_version"] = version
                     activities.append(activity)
                 return activities
             finally:
@@ -1799,14 +1915,35 @@ class LocalExcelRepository:
                     f"{get_column_letter(max_col)}{max_row}"
                 )
 
+    def _current_row_version(self, sheet, field_columns: dict[str, int], row_number: int) -> str:
+        values = {"id": sheet.cell(row_number, field_columns["id"]).value}
+        values.update(self._row_payload(sheet, field_columns, row_number))
+        return row_version(values)
+
     def _save_workbook(self, workbook) -> None:
         if getattr(workbook, "calculation", None) is not None:
             workbook.calculation.fullCalcOnLoad = True
             workbook.calculation.forceFullCalc = True
-        temp_path = self.file_path.with_name(f"{self.file_path.stem}.saving{self.file_path.suffix}")
+        # Nome único: vários usuários gravam na mesma biblioteca sincronizada, e um
+        # nome fixo (.saving.xlsx) colidiria entre PCs e com o próprio OneDrive.
+        descriptor, temp_name = tempfile.mkstemp(
+            prefix=f"{self.file_path.stem}.saving-",
+            suffix=self.file_path.suffix,
+            dir=str(self.file_path.parent),
+        )
+        os.close(descriptor)
+        temp_path = Path(temp_name)
         try:
             workbook.save(temp_path)
             workbook.close()
+            # Se o arquivo mudou desde que foi aberto (o OneDrive trouxe a versão de
+            # outro usuário), NÃO substitui: isso apagaria a alteração dele.
+            opened = getattr(self, "_write_signature", None)
+            if opened is not None and self._file_signature() != opened:
+                raise _ArquivoMudouDuranteGravacao(
+                    "A planilha foi atualizada por outro usuário durante a gravação. "
+                    "Aguarde alguns segundos e tente novamente."
+                )
             os.replace(temp_path, self.file_path)
         finally:
             if temp_path.exists():
@@ -1815,6 +1952,7 @@ class LocalExcelRepository:
                 except OSError:
                     pass
 
+    @_retry_if_file_changed
     def update_activity(self, activity_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         settings = self.get_settings()
         with self._lock:
@@ -1828,6 +1966,16 @@ class LocalExcelRepository:
                 headers, field_columns, mode = self._schema(sheet)
 
                 target_row = self._find_activity_row(sheet, field_columns, activity_id)
+
+                # Edição concorrente: se o formulário informou a versão da linha que
+                # exibiu e a linha mudou no arquivo, não sobrescreve o trabalho alheio.
+                expected_version = clean_text(payload.get("row_version"), 40)
+                if expected_version and _row_version_enabled():
+                    if self._current_row_version(sheet, field_columns, target_row) != expected_version:
+                        raise RepositoryError(
+                            "Esta atividade foi alterada por outro usuário depois que você a abriu. "
+                            "Atualize a lista e refaça a alteração."
+                        )
 
                 # Fields intentionally hidden from the modal must keep their
                 # historical values when another field is edited.
@@ -1861,15 +2009,18 @@ class LocalExcelRepository:
                 self._apply_activity_to_row(
                     sheet, headers, field_columns, target_row, activity, mode, include_id=True
                 )
+                new_version = self._current_row_version(sheet, field_columns, target_row)
                 self._save_workbook(workbook)
                 saved = normalize_activity(activity, use_team_gap=False)
                 saved["record_key"] = self._record_key(target_row, saved["id"])
+                saved["row_version"] = new_version
                 return saved
             except PermissionError as exc:
                 raise RepositoryError("O Excel está bloqueado para edição. Feche o arquivo ou verifique a sincronização.") from exc
             except OSError as exc:
                 raise RepositoryError(f"Não foi possível salvar o Excel: {exc}") from exc
 
+    @_retry_if_file_changed
     def create_activity(self, payload: dict[str, Any]) -> dict[str, Any]:
         settings = self.get_settings()
         with self._lock:
@@ -1915,15 +2066,18 @@ class LocalExcelRepository:
                     sheet, headers, field_columns, target_row, activity, mode, include_id=True
                 )
                 self._extend_tables(sheet, previous_row, target_row)
+                new_version = self._current_row_version(sheet, field_columns, target_row)
                 self._save_workbook(workbook)
                 saved = normalize_activity(activity, use_team_gap=False)
                 saved["record_key"] = self._record_key(target_row, saved["id"])
+                saved["row_version"] = new_version
                 return saved
             except PermissionError as exc:
                 raise RepositoryError("O Excel está bloqueado para inclusão. Feche o arquivo ou verifique a sincronização.") from exc
             except OSError as exc:
                 raise RepositoryError(f"Não foi possível incluir no Excel: {exc}") from exc
 
+    @_retry_if_file_changed
     def delete_activity(self, activity_reference: str) -> dict[str, Any]:
         with self._lock:
             openpyxl = self._openpyxl()
@@ -2300,6 +2454,7 @@ class LocalExcelRepository:
             finally:
                 workbook.close()
 
+    @_retry_if_file_changed
     def save_service_calculation(self, activity_reference: str, payload: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(payload, dict) or not isinstance(payload.get("items"), list):
             raise ValueError("Lista de serviços inválida.")
@@ -2518,6 +2673,7 @@ class LocalExcelRepository:
         activity_options = self._activity_options(self.list_activities())
         return self._read_settings(activity_options)
 
+    @_retry_if_file_changed
     def save_settings(self, payload: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(payload, dict):
             raise ValueError("Configuração inválida.")
